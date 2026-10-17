@@ -77,3 +77,15 @@ account for this measurement limitation.
    compare its full set of linear, Lasso, random-forest, and boosting nuisance
    learners or sensitivity analysis. Complete that reference exercise before
    treating the M5 estimates as a validated causal model.
+9. **Pooled fixed-effects diagnostic:** the pooled model selects up to 2,000
+   eligible item-store series, allocating the sample as evenly as possible
+   across departments and taking the highest-unit series within each
+   department. Eligibility requires 104 observed weeks, 52 positive-sales
+   weeks, three price levels, and at least 5% max/min price range. Within each
+   department, estimate `log(units_sold)` on `log(price)` with item-store and
+   store-week fixed effects; cluster standard errors by item-store. Zero-sales
+   weeks are excluded because the log outcome is undefined, so this estimates
+   the relationship among positive-sales weeks and may be affected by
+   selection. The store-week fixed effects absorb shocks shared by products in
+   that store and week, but the model remains observational and does not by
+   itself establish causal effects.

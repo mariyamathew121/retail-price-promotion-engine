@@ -109,6 +109,24 @@ separate Online Retail example dataset. That reference reproduction and its
 learner/sensitivity comparisons remain to be completed before considering the
 causal approach validated.
 
+### Pooled department fixed-effects model
+
+For a pooled diagnostic that borrows price variation across products, run:
+
+```powershell
+estimate-pooled-elasticity
+```
+
+The default run selects up to 2,000 eligible item-store series, balanced as
+evenly as possible across the seven departments, and estimates one model per
+department. Each model uses `log(units_sold)` on `log(price)`, item-store and
+store-week fixed effects, and standard errors clustered by item-store.
+Zero-sales weeks are omitted because `log(0)` is undefined; interpret these
+estimates as conditional on positive-sales weeks. Results and an audit JSON
+are written to `data/processed/module2_pooled/`. Use `--max-series` to change
+the subset size. Eligibility rules and limitations are recorded in
+[assumptions.md](assumptions.md).
+
 ## Planned modules
 
 1. **Data foundation:** clean M5 item-store-day table (implemented).
