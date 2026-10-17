@@ -103,37 +103,64 @@ controls, zero-sales handling, and interpretation caveats are listed in
 [assumptions.md](assumptions.md). Recommendations are review/test hypotheses,
 not automatic price changes.
 
-**Learning checkpoint:** this first M5 implementation uses the partialling-out
-DML structure but does not yet reproduce every step of the C1 notebook on its
-separate Online Retail example dataset. That reference reproduction and its
-learner/sensitivity comparisons remain to be completed before considering the
-causal approach validated.
+**Learning checkpoint:** the M5 implementation uses the partialling-out DML
+structure. The separate C1 Online Retail reference exercise is also complete:
+four nuisance learners were compared, and a selected M5 series was
+cross-checked against `DoubleMLPLR`. These exercises validate the implementation
+workflow, not the causal identification assumptions or the generalizability of
+the M5 estimates.
 
 ### Pooled department fixed-effects model
 
 For a pooled diagnostic that borrows price variation across products, run:
 
 ```powershell
-estimate-pooled-elasticity
+estimate-pooled-elasticity --max-series 10000 --by-store
 ```
 
 The default run selects up to 2,000 eligible item-store series, balanced as
-evenly as possible across the seven departments, and estimates one model per
-department. Each model uses `log(units_sold)` on `log(price)`, item-store and
-store-week fixed effects, and standard errors clustered by item-store.
-Zero-sales weeks are omitted because `log(0)` is undefined; interpret these
-estimates as conditional on positive-sales weeks. Results and an audit JSON
+evenly as possible across the seven departments, and estimates two models per
+department. Both use item-store and store-week fixed effects and standard
+errors clustered by item-store. The log-linear model uses
+`log(units_sold)` on `log(price)` and excludes zero-sales weeks. PPML models
+units sold using `log(price)` and retains zero-sales weeks. PPML is the primary
+pooled comparison; the log-linear estimate is included as a sensitivity check.
+The `--by-store` option also fits department models separately within each
+store. Per-item-store pricing defaults use the pooled department PPML estimate;
+the individual DML result is retained only as a review flag and does not
+override the default action. Results, the selected series and an audit JSON
 are written to `data/processed/module2_pooled/`. Use `--max-series` to change
 the subset size. Eligibility rules and limitations are recorded in
 [assumptions.md](assumptions.md).
+
+### Module 2 validation
+
+Install the optional DoubleML validation dependency and download the C1
+preprocessed `elasticity_subset.csv` from
+<https://raw.githubusercontent.com/DoubleML/doubleml-docs/main/doc/examples/data/elasticity_subset.csv>
+to `data/raw/elasticity_subset.csv`, then run:
+
+```powershell
+py -m pip install -e ".[validation]"
+validate-module2
+```
+
+This runs the C1 PLR example with linear, LassoCV, random-forest, and
+histogram-gradient-boosting nuisance learners, evaluates their nuisance
+prediction performance, and cross-checks a selected M5 series against
+`DoubleMLPLR`. The input data and generated validation outputs remain under
+ignored `data/` paths: `data/processed/module2_validation/` contains the
+learner results CSV, audit JSON, and M5 cross-check JSON. The recorded results
+and interpretation are summarized in
+`outputs/module2/module2_elasticity_interpretation.md`.
 
 ## Planned modules
 
 1. **Data foundation:** clean M5 item-store-day table (implemented).
 2. **Price elasticity:** select price-varying SKU-store combinations, compare
    naive log-log regression with cross-fitted DML, and produce confidence
-   intervals and cautious actions (M5 implementation complete; C1 reference
-   reproduction remains).
+   intervals and cautious actions (M5 implementation, pooled diagnostics, and
+   C1/DoubleML validation complete; interpretation and limits are documented).
 3. **Promotion uplift:** estimate incremental units and profit against a
    documented baseline, then assess post-promotion dips.
 4. **Markdown optimization:** simulate markdown choices and leftover salvage

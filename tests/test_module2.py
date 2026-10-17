@@ -7,10 +7,43 @@ import pyarrow.parquet as pq
 import pytest
 
 from retail_engine.module2 import (
+    _crossfit_dml,
     _hac_standard_error,
     _weekly_control_matrix,
     estimate_price_elasticity,
 )
+
+
+def test_crossfit_dml_recovers_simulated_elasticity():
+    rng = np.random.default_rng(31)
+    n = 3_000
+    controls = rng.uniform(-1, 1, size=(n, 3))
+    log_price = (
+        0.9 * controls[:, 0]
+        + controls[:, 1] ** 2
+        + 0.5 * np.sin(np.pi * controls[:, 2])
+        + rng.normal(scale=0.6, size=n)
+    )
+    true_elasticity = -1.5
+    log_units = (
+        true_elasticity * log_price
+        + 1.5 * controls[:, 0]
+        + np.cos(np.pi * controls[:, 1])
+        + rng.normal(scale=0.3, size=n)
+    )
+
+    estimate, standard_error = _crossfit_dml(
+        log_price,
+        log_units,
+        controls,
+        np.arange(n),
+        folds=5,
+        trees=80,
+        seed=31,
+    )
+
+    assert estimate == pytest.approx(true_elasticity, abs=0.2)
+    assert standard_error > 0
 
 
 def test_estimates_eligible_series_and_writes_outputs(tmp_path):

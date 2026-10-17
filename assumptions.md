@@ -71,21 +71,44 @@ account for this measurement limitation.
 7. **Action threshold:** apply the supplied business rules only when the DML
    confidence interval excludes zero. Positive or statistically unclear
    estimates are marked unclear and receive no action.
-8. **Reference status:** this is an M5-specific implementation of the
-   partialling-out DML approach. It does not reproduce the C1 notebook
-   cell-for-cell on the notebook's separate Online Retail example data, nor
-   compare its full set of linear, Lasso, random-forest, and boosting nuisance
-   learners or sensitivity analysis. Complete that reference exercise before
-   treating the M5 estimates as a validated causal model.
-9. **Pooled fixed-effects diagnostic:** the pooled model selects up to 2,000
+8. **Reference validation and limits:** the C1 partialling-out DoubleML
+   exercise was run on its separate 10,000-row Online Retail example with
+   linear, LassoCV, random-forest, and histogram-gradient-boosting nuisance
+   learners. A selected M5 series was also cross-checked against
+   `DoubleMLPLR`. These are implementation checks, not proof of causal
+   identification or validation of the M5 estimates. The C1 dataset is
+   different from M5; the M5 check covers one series, uses random folds and
+   DoubleML's default IID inference versus consecutive folds and HAC
+   uncertainty in the custom estimator, and should be interpreted as a
+   point-estimate comparison only. See
+   `outputs/module2/module2_elasticity_interpretation.md` for the results.
+9. **Pooled fixed-effects diagnostic:** the pooled model selects up to the
+   requested number of
    eligible item-store series, allocating the sample as evenly as possible
-   across departments and taking the highest-unit series within each
-   department. Eligibility requires 104 observed weeks, 52 positive-sales
-   weeks, three price levels, and at least 5% max/min price range. Within each
-   department, estimate `log(units_sold)` on `log(price)` with item-store and
-   store-week fixed effects; cluster standard errors by item-store. Zero-sales
-   weeks are excluded because the log outcome is undefined, so this estimates
-   the relationship among positive-sales weeks and may be affected by
-   selection. The store-week fixed effects absorb shocks shared by products in
-   that store and week, but the model remains observational and does not by
-   itself establish causal effects.
+   across departments subject to department eligibility counts, taking the
+   highest-unit series within each department. Eligibility requires 104
+   observed weeks, 52 positive-sales weeks, three price levels, and at least
+   5% max/min price range. Within each department, estimate two models with
+   item-store and store-week fixed effects, clustering standard errors by
+   item-store:
+   `log(units_sold)` on `log(price)` using positive-sales weeks only, and PPML
+   of units on `log(price)` retaining zero-sales weeks. PPML is the preferred
+   pooled comparison because it retains zeros; the log-linear model is shown
+   alongside it as a sensitivity check. PyFixest drops singleton fixed-effect
+   observations. The sample is selected using sales volume, and the estimates
+   remain observational; fixed effects do not by themselves establish causal
+   effects or remove item-specific time-varying confounding.
+10. **Store stability:** with `--by-store`, repeat both specifications within
+    each store and department using the same item-store clusters and store-week
+    fixed effects. These estimates are diagnostic comparisons; smaller
+    department-by-store samples can have wide intervals and are not assumed
+    interchangeable.
+11. **SKU pricing default:** for the selected item-store series, use the
+    department-level PPML estimate and its 95% interval to assign the default
+    class and recommendation. If the interval includes zero, or the point
+    estimate is non-negative, take no pricing action. Otherwise, estimates
+    below -1 are price-sensitive and prompt a controlled discount/promotion
+    test; estimates from -1 to 0 are less sensitive and support price
+    protection or a small-increase test. The matched per-series DML estimate
+    and class are only a disagreement flag; they do not override the pooled
+    default recommendation.
