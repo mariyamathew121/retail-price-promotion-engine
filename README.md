@@ -154,15 +154,34 @@ learner results CSV, audit JSON, and M5 cross-check JSON. The recorded results
 and interpretation are summarized in
 `outputs/module2/module2_elasticity_interpretation.md`.
 
-## Planned modules
+### Module 3: promotion uplift
+
+After Module 1 has produced the clean Parquet file, run:
+
+```powershell
+estimate-promotion-uplift
+```
+
+The command groups consecutive inferred promotion weeks for each item-store,
+compares sales with the median of the four latest non-promotion weeks in the
+preceding eight calendar weeks, and estimates incremental revenue and margin.
+It assumes a 30% regular-price gross margin by default; pass
+`--gross-margin-rate` to override it. Episodes without enough baseline weeks
+are retained and marked for review, rather than silently omitted. The CSV and
+audit JSON are written to `data/processed/module3/`. The calculation,
+recommendation rules, and financial assumptions are documented in
+`assumptions.md`; first-run totals and hand calculations are in
+`outputs/module3/promotion_uplift_summary.md`.
+
+## Module status and roadmap
 
 1. **Data foundation:** clean M5 item-store-day table (implemented).
 2. **Price elasticity:** select price-varying SKU-store combinations, compare
    naive log-log regression with cross-fitted DML, and produce confidence
    intervals and cautious actions (M5 implementation, pooled diagnostics, and
    C1/DoubleML validation complete; interpretation and limits are documented).
-3. **Promotion uplift:** estimate incremental units and profit against a
-   documented baseline, then assess post-promotion dips.
+3. **Promotion uplift:** estimated incremental units and profit against a
+   documented baseline, with a two-week post-promotion dip check (implemented).
 4. **Markdown optimization:** simulate markdown choices and leftover salvage
    value using the separate markdown dataset.
 5. **Market basket and bundles:** mine Instacart associations and mark

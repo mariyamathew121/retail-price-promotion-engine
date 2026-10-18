@@ -112,3 +112,40 @@ account for this measurement limitation.
     protection or a small-increase test. The matched per-series DML estimate
     and class are only a disagreement flag; they do not override the pooled
     default recommendation.
+
+## Module 3 — promotion uplift
+
+1. **Promotion windows:** use the Module 1 inferred `promo_flag`; a promotion
+    is one or more consecutive Saturday-start M5 weeks flagged for the same
+    item-store. This is a price-drop proxy, not a retailer-supplied promotion
+    calendar.
+2. **Baseline:** for each window, take the median units sold across the four
+    latest non-promotion weeks found within the preceding eight calendar weeks.
+    Multiply that weekly median by the promotion duration to estimate baseline
+    sales. If four non-promotion weeks are not available, report the episode as
+    insufficient baseline and do not make a promotion recommendation.
+3. **Gross margin:** assume a 30% gross margin at regular price unless
+    overridden with `--gross-margin-rate`. Estimated unit cost is
+    `regular_price * (1 - gross_margin_rate)` and remains fixed during the
+    promotion. This is a simplifying financial assumption, not observed cost
+    data.
+4. **Incremental revenue and margin:** compare actual promotion-period revenue
+    and contribution with the estimated no-promotion baseline. Baseline revenue
+    is baseline units multiplied by the promotion weeks' regular prices.
+    Promotion contribution uses actual promotional prices less the estimated
+    fixed unit cost; baseline contribution is baseline revenue times the
+    assumed gross-margin rate.
+5. **Promotion ROI:** calculate as incremental margin divided by discount
+    cost, where discount cost is the regular-price-to-promotion-price
+    difference times actual promoted units. If discount cost is zero, ROI is
+    unavailable rather than treated as zero.
+6. **Recommendation:** stop a promotion when incremental units are zero or
+    negative; when incremental units are positive but incremental margin is
+    zero or negative, reduce the discount; continue only when both incremental
+    units and incremental margin are positive. These are screening rules, not
+    automatic pricing actions.
+7. **Post-promotion dip:** compare the two following calendar weeks with the
+    baseline weekly unit rate. Report a dip only when both post-promotion weeks
+    are present; a negative value means post-promotion sales were below
+    baseline. The post-promotion result is diagnostic and does not alter the
+    promotion recommendation.
