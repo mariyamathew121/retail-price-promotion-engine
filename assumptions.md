@@ -105,13 +105,13 @@ account for this measurement limitation.
     interchangeable.
 11. **SKU pricing default:** for the selected item-store series, use the
     department-level PPML estimate and its 95% interval to assign the default
-    class and recommendation. If the interval includes zero, or the point
-    estimate is non-negative, take no pricing action. Otherwise, estimates
-    below -1 are price-sensitive and prompt a controlled discount/promotion
-    test; estimates from -1 to 0 are less sensitive and support price
-    protection or a small-increase test. The matched per-series DML estimate
-    and class are only a disagreement flag; they do not override the pooled
-    default recommendation.
+    class and recommendation. This is a department-level default attached to
+    selected item-store rows, not an SKU-specific elasticity estimate. Assign
+    price-sensitive only when the department estimate's upper 95% confidence
+    bound is below -1; assign less sensitive when that upper bound is below
+    zero but not below -1; otherwise mark unclear and take no pricing action.
+    The matched per-series DML estimate and class are only a disagreement flag;
+    they do not override the pooled department-level default.
 
 ## Module 3 — promotion uplift
 

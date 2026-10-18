@@ -127,11 +127,23 @@ units sold using `log(price)` and retains zero-sales weeks. PPML is the primary
 pooled comparison; the log-linear estimate is included as a sensitivity check.
 The `--by-store` option also fits department models separately within each
 store. Per-item-store pricing defaults use the pooled department PPML estimate;
-the individual DML result is retained only as a review flag and does not
-override the default action. Results, the selected series and an audit JSON
-are written to `data/processed/module2_pooled/`. Use `--max-series` to change
-the subset size. Eligibility rules and limitations are recorded in
+these are department-level defaults attached to item-store rows, not
+SKU-specific elasticity estimates. A series is called price-sensitive only
+when the upper 95% CI bound is below -1. The individual DML result is retained
+only as a review flag and does not override the default action. Results, the
+selected series and an audit JSON are written to
+`data/processed/module2_pooled/`. Use `--max-series` to change the subset
+size. Eligibility rules and limitations are recorded in
 [assumptions.md](assumptions.md).
+
+Module 2 interpretation artifacts, including the naive/DML/pooled comparison,
+category medians, and positive-elasticity diagnostic plots, are in
+`outputs/module2/`. Recreate the five largest positive-series plots and their
+diagnostic notes with:
+
+```powershell
+py -3.10 outputs/module2/generate_positive_elasticity_cases.py
+```
 
 ### Module 2 validation
 

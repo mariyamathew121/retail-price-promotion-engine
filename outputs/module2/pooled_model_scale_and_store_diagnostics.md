@@ -7,6 +7,12 @@ Both sample sizes are saved separately under
 The generated CSV files and audit JSONs contain the row counts, selected
 series, exact estimates, intervals, and specification details.
 
+The requested action-rule rerun
+(`estimate-pooled-elasticity --max-series 10000 --by-store`) was written to
+`data/processed/module2_pooled/`; this rerun uses the same 10,000-series
+design and refreshes the department recommendation defaults under the revised
+upper-confidence-bound rule.
+
 The run used 2.84 GiB available RAM before the corrected 10,000-series
 department comparison and 2.70 GiB before the 10,000-series by-store run
 (15.68 GiB total RAM). Both completed; available RAM afterward was 2.67 GiB.
@@ -26,10 +32,10 @@ Peak process memory was not separately profiled.
 |---|---:|---:|
 | FOODS_1 | -0.826 [-1.005, -0.647] | -1.301 [-1.597, -1.006] |
 | FOODS_2 | -0.268 [-0.416, -0.121] | -1.058 [-1.312, -0.804] |
-| FOODS_3 | -0.626 [-0.790, -0.462] | -0.883 [-1.048, -0.717] |
+| FOODS_3 | -0.619 [-0.783, -0.454] | -0.882 [-1.048, -0.716] |
 | HOBBIES_1 | -0.515 [-0.686, -0.345] | -0.680 [-0.993, -0.366] |
-| HOBBIES_2 | -0.389 [-0.486, -0.292] | -0.719 [-0.911, -0.527] |
-| HOUSEHOLD_1 | -0.335 [-0.464, -0.207] | -0.458 [-0.654, -0.262] |
+| HOBBIES_2 | -0.389 [-0.486, -0.292] | -0.721 [-0.913, -0.528] |
+| HOUSEHOLD_1 | -0.336 [-0.464, -0.207] | -0.458 [-0.655, -0.262] |
 | HOUSEHOLD_2 | -0.332 [-0.417, -0.246] | -0.353 [-0.512, -0.195] |
 
 ## Scaling comparison
@@ -38,10 +44,10 @@ Peak process memory was not separately profiled.
 |---|---:|---:|---:|---:|---:|---:|
 | FOODS_1 | -1.827 | -1.301 | 1.582 → 0.591 | -0.340 | -0.826 | 1.574 → 0.358 |
 | FOODS_2 | -1.271 | -1.058 | 0.907 → 0.508 | -0.338 | -0.268 | 0.783 → 0.295 |
-| FOODS_3 | -0.822 | -0.883 | 0.590 → 0.332 | -0.159 | -0.626 | 0.983 → 0.328 |
+| FOODS_3 | -0.822 | -0.882 | 0.590 → 0.332 | -0.159 | -0.619 | 0.983 → 0.329 |
 | HOBBIES_1 | -0.726 | -0.680 | 1.091 → 0.626 | -0.629 | -0.515 | 1.289 → 0.341 |
-| HOBBIES_2 | -0.862 | -0.719 | 0.521 → 0.384 | -0.555 | -0.389 | 0.297 → 0.194 |
-| HOUSEHOLD_1 | -0.139 | -0.458 | 1.060 → 0.393 | +0.275 | -0.335 | 0.983 → 0.257 |
+| HOBBIES_2 | -0.862 | -0.721 | 0.521 → 0.384 | -0.555 | -0.389 | 0.297 → 0.194 |
+| HOUSEHOLD_1 | -0.139 | -0.458 | 1.060 → 0.393 | +0.275 | -0.336 | 0.983 → 0.257 |
 | HOUSEHOLD_2 | -0.056 | -0.353 | 0.775 → 0.317 | -0.278 | -0.332 | 0.603 → 0.170 |
 
 Median interval width narrowed by **56.7% for PPML** (0.907 to 0.393) and
@@ -50,9 +56,10 @@ departments, though several magnitudes moved. FEOLS HOUSEHOLD_1 changed sign.
 Thus, the intervals tightened with the larger sample, but exact estimates
 should not be described as fully stable across sample sizes/specifications.
 
-The 10,000 selected-series counts are 1,505 FOODS_1; 1,580 FOODS_2; 1,580
-FOODS_3; 1,580 HOBBIES_1; 596 HOBBIES_2; 1,580 HOUSEHOLD_1; and 1,579
-HOUSEHOLD_2. HOBBIES_2 is capped by its 596 eligible series.
+The 10,000 selected-series counts in the latest rerun are 1,505 FOODS_1;
+1,580 FOODS_2; 1,580 FOODS_3; 1,580 HOBBIES_1; 597 HOBBIES_2; 1,579
+HOUSEHOLD_1; and 1,579 HOUSEHOLD_2. HOBBIES_2 is capped by its eligible
+series count.
 
 ## Store-level stability
 
@@ -76,13 +83,21 @@ There is substantial store heterogeneity. Each store-by-department model has
 fewer clusters than the department-wide model; selected series range from 44
 to 187 in individual store/departments. Interpret extremes cautiously.
 
-## SKU default policy check
+## Department-level default policy check
+
+The defaults below are department-level estimates attached to selected
+item-store rows; they are **not SKU-specific elasticity estimates**. A
+department is classified as price-sensitive only if the upper 95% confidence
+bound is below -1. It is less sensitive if the upper bound is below zero but
+not below -1; otherwise it is unclear and no pricing action is recommended.
+Under this rule, FOODS_2 (PPML -1.058, 95% CI [-1.312, -0.804]) is less
+sensitive, and only FOODS_1 is price-sensitive.
 
 The output `item_store_pricing_defaults.csv` applies the department PPML class
 and recommendation to the selected item-store series. The individual DML
 estimate is included only as a class-disagreement flag. On this run, the pooled
-default assigned 3,085 series to a controlled discount/promotion test and
-6,915 to price protection/small-increase testing. Only 8 of the 100 matched
-individual DML classes agreed with the pooled class; the remaining 92 are
+default assigned 1,505 series to a controlled discount/promotion test and
+8,495 to price protection/small-increase testing. Only 3 of the 100 matched
+individual DML classes agreed with the pooled class; the remaining 97 are
 review flags, not overrides. Treat the high disagreement as a model
 validation warning, not an endorsement of automatic price actions.

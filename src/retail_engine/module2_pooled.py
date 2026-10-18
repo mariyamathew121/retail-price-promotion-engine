@@ -176,14 +176,12 @@ def _fit_department(group: pd.DataFrame) -> dict[str, object]:
     }
 
 
-def _pooled_action(
-    elasticity: float, lower: float, upper: float
-) -> tuple[str, str]:
-    if lower <= 0 <= upper or elasticity >= 0:
-        return "Unclear", "Flag for review; take no pricing action"
-    if elasticity < -1:
+def _pooled_action(upper: float) -> tuple[str, str]:
+    if upper < -1:
         return "Price-sensitive", "Test a controlled discount or promotion"
-    return "Less sensitive", "Protect price or test a small increase"
+    if upper < 0:
+        return "Less sensitive", "Protect price or test a small increase"
+    return "Unclear", "Flag for review; take no pricing action"
 
 
 def _build_item_store_recommendations(
@@ -224,12 +222,8 @@ def _build_item_store_recommendations(
         )
 
     actions = [
-        _pooled_action(estimate, lower, upper)
-        for estimate, lower, upper in zip(
-            recommendations["ppml_elasticity"],
-            recommendations["ppml_ci_lower"],
-            recommendations["ppml_ci_upper"],
-        )
+        _pooled_action(upper)
+        for upper in recommendations["ppml_ci_upper"]
     ]
     recommendations["pooled_demand_type"] = [action[0] for action in actions]
     recommendations["pricing_recommendation"] = [action[1] for action in actions]

@@ -38,13 +38,19 @@ that one elasticity applies uniformly across stores or prove causality.
 
 ## Decision rule and limits
 
-For now, use the pooled department PPML estimate and its interval as the
-default classification for selected item-store combinations. Only recommend a
-test when the interval excludes zero; treat negative estimates below -1 as
-price-sensitive and those between -1 and zero as less sensitive. The
-per-series DML classification is a disagreement flag only. In the 10,000-series
-output, 92 of the 100 matched DML classes differ from the pooled class, which
-should prompt review rather than an override.
+For now, use the pooled department PPML estimate and its interval as a
+department-level default attached to selected item-store combinations; these
+defaults are **not SKU-specific elasticity estimates**. Classify as
+price-sensitive only when the upper 95% confidence bound is below -1;
+classify as less sensitive when that upper bound is below zero but not below
+-1; otherwise mark unclear and take no pricing action. In the rerun, only
+FOODS_1 meets the price-sensitive threshold; the other six departments are
+less sensitive. FOODS_2's estimate of -1.058 with CI [-1.312, -0.804] is less
+sensitive because the upper bound is not below -1. The selected-series
+defaults therefore classify 1,505 series as price-sensitive and 8,495 as
+less sensitive. The per-series DML classification is a disagreement flag
+only. In the 10,000-series output, 97 of the 100 matched DML classes differ
+from the pooled default, which should prompt review rather than an override.
 
 The estimates still rely on observational M5 data and an inferred promotion
 proxy. Store-week fixed effects do not remove product-specific time-varying

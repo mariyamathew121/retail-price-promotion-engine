@@ -173,3 +173,32 @@ def test_per_series_dml_is_only_a_flag_not_the_default_action():
     assert result["pooled_demand_type"] == "Price-sensitive"
     assert result["pricing_recommendation"] == "Test a controlled discount or promotion"
     assert result["dml_review_flag"] == "DML class differs from pooled default"
+
+
+def test_pooled_action_requires_upper_interval_bound_below_minus_one():
+    selected = pd.DataFrame(
+        [
+            {
+                "item_id": "FOODS_2_001",
+                "store_id": "CA_1",
+                "dept_id": "FOODS_2",
+            }
+        ]
+    )
+    pooled = pd.DataFrame(
+        [
+            {
+                "dept_id": "FOODS_2",
+                "ppml_elasticity": -1.058,
+                "ppml_ci_lower": -1.312,
+                "ppml_ci_upper": -0.804,
+            }
+        ]
+    )
+
+    result = _build_item_store_recommendations(
+        selected, pooled, pd.DataFrame()
+    ).iloc[0]
+
+    assert result["pooled_demand_type"] == "Less sensitive"
+    assert result["pricing_recommendation"] == "Protect price or test a small increase"
