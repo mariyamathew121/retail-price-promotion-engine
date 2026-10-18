@@ -163,13 +163,16 @@ estimate-promotion-uplift
 ```
 
 The command groups consecutive inferred promotion weeks for each item-store,
-compares sales with the median of the four latest non-promotion weeks in the
+compares sales with the mean of the four latest non-promotion weeks in the
 preceding eight calendar weeks, and estimates incremental revenue and margin.
-It assumes a 30% regular-price gross margin by default; pass
-`--gross-margin-rate` to override it. Episodes without enough baseline weeks
-are retained and marked for review, rather than silently omitted. The CSV and
-audit JSON are written to `data/processed/module3/`. The calculation,
-recommendation rules, and financial assumptions are documented in
+It uses assumed regular-price gross margins of 25% for FOODS, 35% for
+HOUSEHOLD, and 40% for HOBBIES. These are assumptions, not data; pass
+`--gross-margin-rate` only when intentionally overriding the category margins.
+The output records each episode's category, average discount depth, and margin
+rate used. Episodes without enough baseline weeks are retained and marked for
+review, rather than silently omitted. The CSV and audit JSON are written to
+`data/processed/module3/`. The calculation, recommendation rules, and
+financial assumptions are documented in
 `assumptions.md`; first-run totals and hand calculations are in
 `outputs/module3/promotion_uplift_summary.md`.
 

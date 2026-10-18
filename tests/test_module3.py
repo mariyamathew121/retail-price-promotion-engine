@@ -17,11 +17,13 @@ def _promotion_example(
         {
             "item_id": item_id,
             "store_id": "CA_1",
+            "cat_id": "FOODS",
             "week_start": week_starts,
             "units_sold": units,
             "price": prices,
             "regular_price": 10.0,
             "promo_flag": promo_flags,
+            "discount_depth": 0.1,
         }
     )
 
@@ -35,7 +37,7 @@ def test_three_hand_calculated_promotion_examples():
     results = {
         result["item_id"]: result
         for case in cases
-        for result in _evaluate_series_promotions(case)
+        for result in _evaluate_series_promotions(case, gross_margin_rate=0.30)
     }
 
     assert results["continue"]["baseline_sales"] == 20
@@ -48,6 +50,7 @@ def test_three_hand_calculated_promotion_examples():
     assert results["continue"]["promo_profit"] == 80
     assert results["continue"]["incremental_margin"] == 20
     assert results["continue"]["discount_cost"] == 40
+    assert results["continue"]["margin_rate_used"] == 0.30
     assert results["continue"]["promotion_ROI"] == 0.5
     assert results["continue"]["recommendation"] == "Continue promotion"
 
@@ -76,6 +79,41 @@ def test_three_hand_calculated_promotion_examples():
     for result in results.values():
         assert result["post_promo_weeks_observed"] == 2
         assert result["post_promo_dip_units"] == -4
+
+
+def test_category_margin_is_used_without_an_override():
+    result = _evaluate_series_promotions(
+        _promotion_example("foods_default", (20, 20), 9.0)
+    )[0]
+
+    assert result["cat_id"] == "FOODS"
+    assert result["avg_discount_depth"] == 0.1
+    assert result["margin_rate_used"] == 0.25
+    assert result["baseline_profit"] == 50
+    assert result["promo_profit"] == 60
+    assert result["incremental_margin"] == 10
+
+
+def test_persistent_low_price_is_flagged_for_review():
+    weekly = _promotion_example("persistent_price", (20, 20), 9.0)
+    weekly.loc[6, "price"] = 9.0
+
+    result = _evaluate_series_promotions(weekly, gross_margin_rate=0.30)[0]
+
+    assert result["price_persists"] is True
+    assert result["recommendation"] == "Possible permanent price change - review"
+
+
+def test_persistent_price_review_takes_precedence_when_baseline_is_insufficient():
+    weekly = _promotion_example("persistent_short_history", (20, 20), 9.0)
+    weekly = weekly.iloc[3:].copy()
+    weekly.loc[6, "price"] = 9.0
+
+    result = _evaluate_series_promotions(weekly)[0]
+
+    assert result["analysis_status"] == "insufficient_baseline"
+    assert result["price_persists"] is True
+    assert result["recommendation"] == "Possible permanent price change - review"
 
 
 def test_insufficient_history_is_reported_without_a_recommendation():

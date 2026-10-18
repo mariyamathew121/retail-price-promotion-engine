@@ -11,16 +11,20 @@ import pandas as pd
 
 from retail_engine.module2 import WEEK_START_SQL
 
-DEFAULT_GROSS_MARGIN_RATE = 0.30
+CATEGORY_MARGIN_RATES = {"FOODS": 0.25, "HOUSEHOLD": 0.35, "HOBBIES": 0.40}
 BASELINE_WEEKS = 4
 BASELINE_LOOKBACK_WEEKS = 8
 POST_PROMO_WEEKS = 2
 OUTPUT_COLUMNS = [
     "item_id",
     "store_id",
+    "cat_id",
+    "avg_discount_depth",
+    "margin_rate_used",
     "promotion_start",
     "promotion_end",
     "promotion_weeks",
+    "price_persists",
     "baseline_weeks_used",
     "baseline_units_per_week",
     "baseline_sales",
@@ -63,12 +67,11 @@ def _promotion_runs(weekly: pd.DataFrame) -> list[pd.DataFrame]:
 
 def _evaluate_series_promotions(
     weekly: pd.DataFrame,
-    gross_margin_rate: float = DEFAULT_GROSS_MARGIN_RATE,
+    gross_margin_rate: float | None = None,
     baseline_weeks: int = BASELINE_WEEKS,
     baseline_lookback_weeks: int = BASELINE_LOOKBACK_WEEKS,
     post_promo_weeks: int = POST_PROMO_WEEKS,
 ) -> list[dict[str, object]]:
-    _validate_gross_margin_rate(gross_margin_rate)
     if baseline_weeks <= 0 or baseline_lookback_weeks < baseline_weeks:
         raise ValueError(
             "baseline_lookback_weeks must be at least baseline_weeks, both positive"
@@ -83,8 +86,21 @@ def _evaluate_series_promotions(
 
     results: list[dict[str, object]] = []
     for episode in _promotion_runs(ordered):
+        cat_id = str(episode["cat_id"].iloc[0])
+        rate = (
+            gross_margin_rate
+            if gross_margin_rate is not None
+            else CATEGORY_MARGIN_RATES[cat_id]
+        )
+        _validate_gross_margin_rate(rate)
         first_week = episode["week_start"].iloc[0]
         last_week = episode["week_start"].iloc[-1]
+        nxt = ordered.loc[
+            ordered["week_start"] == last_week + pd.Timedelta(weeks=1), "price"
+        ]
+        price_persists = bool(
+            len(nxt) and nxt.iloc[0] <= episode["price"].iloc[-1] * 1.05
+        )
         duration = len(episode)
         promo_sales = float(episode["units_sold"].sum())
         baseline_history = ordered.loc[
@@ -99,9 +115,13 @@ def _evaluate_series_promotions(
         base: dict[str, object] = {
             "item_id": str(episode["item_id"].iloc[0]),
             "store_id": str(episode["store_id"].iloc[0]),
+            "cat_id": cat_id,
+            "avg_discount_depth": float(episode["discount_depth"].mean()),
+            "margin_rate_used": rate,
             "promotion_start": first_week.date().isoformat(),
             "promotion_end": (last_week + pd.Timedelta(days=6)).date().isoformat(),
             "promotion_weeks": duration,
+            "price_persists": price_persists,
             "baseline_weeks_used": len(baseline_history),
             "baseline_units_per_week": None,
             "baseline_sales": None,
@@ -123,20 +143,24 @@ def _evaluate_series_promotions(
             "post_promo_weeks_observed": 0,
             "post_promo_sales": None,
             "post_promo_dip_units": None,
-            "recommendation": "Review - insufficient baseline",
+            "recommendation": (
+                "Possible permanent price change - review"
+                if price_persists
+                else "Review - insufficient baseline"
+            ),
             "analysis_status": "insufficient_baseline",
         }
         if not enough_history:
             results.append(base)
             continue
 
-        baseline_units_per_week = float(baseline_history["units_sold"].median())
+        baseline_units_per_week = float(baseline_history["units_sold"].mean())
         baseline_sales = baseline_units_per_week * duration
         baseline_revenue = float(
             baseline_units_per_week * episode["regular_price"].sum()
         )
-        baseline_profit = baseline_revenue * gross_margin_rate
-        unit_cost = episode["regular_price"] * (1 - gross_margin_rate)
+        baseline_profit = baseline_revenue * rate
+        unit_cost = episode["regular_price"] * (1 - rate)
         promo_profit = float(
             ((episode["price"] - unit_cost) * episode["units_sold"]).sum()
         )
@@ -150,6 +174,8 @@ def _evaluate_series_promotions(
             recommendation = "Reduce discount"
         else:
             recommendation = "Continue promotion"
+        if price_persists:
+            recommendation = "Possible permanent price change - review"
 
         post_sales: float | None = None
         post_dip: float | None = None
@@ -214,22 +240,26 @@ def _weekly_promotion_data(parquet_path: Path) -> pd.DataFrame:
                 columns=[
                     "item_id",
                     "store_id",
+                    "cat_id",
                     "week_start",
                     "units_sold",
                     "price",
                     "regular_price",
                     "promo_flag",
+                    "discount_depth",
                 ]
             )
 
         connection.register("promoted_series", promoted_series)
         return connection.execute(
             f"""
-            SELECT d.item_id, d.store_id, {WEEK_START_SQL} AS week_start,
+            SELECT d.item_id, d.store_id, MAX(d.cat_id) AS cat_id,
+                   {WEEK_START_SQL} AS week_start,
                    SUM(d.units_sold)::DOUBLE AS units_sold,
                    AVG(d.price)::DOUBLE AS price,
                    AVG(d.regular_price)::DOUBLE AS regular_price,
-                   MAX(d.promo_flag)::INTEGER AS promo_flag
+                   MAX(d.promo_flag)::INTEGER AS promo_flag,
+                   AVG(d.discount_depth)::DOUBLE AS discount_depth
             FROM read_parquet(?) AS d
             INNER JOIN promoted_series AS p
                 ON d.item_id = p.item_id AND d.store_id = p.store_id
@@ -243,7 +273,7 @@ def _weekly_promotion_data(parquet_path: Path) -> pd.DataFrame:
 def _audit_summary(
     results: pd.DataFrame,
     parquet_path: Path,
-    gross_margin_rate: float,
+    gross_margin_rate: float | None,
 ) -> dict[str, object]:
     recommendation_counts = {
         str(key): int(value)
@@ -265,14 +295,21 @@ def _audit_summary(
             "A promotion window is one or more consecutive Saturday-start M5 "
             "weeks with promo_flag=1 in the Module 1 inferred price-drop proxy."
         ),
+        "persistent_price_review_rule": (
+            "If the next observed week price is at most 105% of the final "
+            "promotion-week price, recommend Possible permanent price change - "
+            "review instead of Continue/Reduce/Stop. If baseline history is "
+            "insufficient, the persistence review takes precedence."
+        ),
         "baseline_method": (
-            f"Median weekly units from the {BASELINE_WEEKS} latest non-promotion "
+            f"Mean weekly units from the {BASELINE_WEEKS} latest non-promotion "
             f"weeks in the {BASELINE_LOOKBACK_WEEKS} calendar weeks before the "
             "promotion; require all baseline weeks or mark insufficient."
         ),
-        "gross_margin_rate_assumption": gross_margin_rate,
+        "category_margin_rate_assumptions": CATEGORY_MARGIN_RATES,
+        "gross_margin_rate_override": gross_margin_rate,
         "unit_cost_method": (
-            "Estimated unit cost is regular_price * (1 - gross_margin_rate); "
+            "Estimated unit cost is regular_price * (1 - margin_rate_used); "
             "cost is held fixed during the promotion."
         ),
         "promotion_roi_method": (
@@ -293,9 +330,10 @@ def _audit_summary(
 def build_promotion_uplift(
     parquet_path: Path,
     output_dir: Path,
-    gross_margin_rate: float = DEFAULT_GROSS_MARGIN_RATE,
+    gross_margin_rate: float | None = None,
 ) -> pd.DataFrame:
-    _validate_gross_margin_rate(gross_margin_rate)
+    if gross_margin_rate is not None:
+        _validate_gross_margin_rate(gross_margin_rate)
     weekly = _weekly_promotion_data(parquet_path)
     promotions: list[dict[str, object]] = []
     if not weekly.empty:
@@ -334,8 +372,8 @@ def main() -> None:
     parser.add_argument(
         "--gross-margin-rate",
         type=float,
-        default=DEFAULT_GROSS_MARGIN_RATE,
-        help="Assumed regular-price gross margin rate (default: 0.30)",
+        default=None,
+        help="Override the assumed category-specific regular-price gross margins",
     )
     args = parser.parse_args()
     results = build_promotion_uplift(

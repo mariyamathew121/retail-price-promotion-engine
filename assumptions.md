@@ -119,16 +119,18 @@ account for this measurement limitation.
     is one or more consecutive Saturday-start M5 weeks flagged for the same
     item-store. This is a price-drop proxy, not a retailer-supplied promotion
     calendar.
-2. **Baseline:** for each window, take the median units sold across the four
+2. **Baseline:** for each window, take the mean units sold across the four
     latest non-promotion weeks found within the preceding eight calendar weeks.
-    Multiply that weekly median by the promotion duration to estimate baseline
+    Multiply that weekly mean by the promotion duration to estimate baseline
     sales. If four non-promotion weeks are not available, report the episode as
     insufficient baseline and do not make a promotion recommendation.
-3. **Gross margin:** assume a 30% gross margin at regular price unless
-    overridden with `--gross-margin-rate`. Estimated unit cost is
-    `regular_price * (1 - gross_margin_rate)` and remains fixed during the
-    promotion. This is a simplifying financial assumption, not observed cost
-    data.
+3. **Gross margin:** assume category-specific regular-price gross margins of
+    25% for FOODS, 35% for HOUSEHOLD, and 40% for HOBBIES. These are business
+    assumptions, not observed M5 costs or data. `--gross-margin-rate` explicitly
+    overrides the category rate for every category. Estimated unit cost is
+    `regular_price * (1 - margin_rate_used)` and remains fixed during the
+    promotion. The output records the category and margin rate used for each
+    episode.
 4. **Incremental revenue and margin:** compare actual promotion-period revenue
     and contribution with the estimated no-promotion baseline. Baseline revenue
     is baseline units multiplied by the promotion weeks' regular prices.
@@ -144,7 +146,14 @@ account for this measurement limitation.
     zero or negative, reduce the discount; continue only when both incremental
     units and incremental margin are positive. These are screening rules, not
     automatic pricing actions.
-7. **Post-promotion dip:** compare the two following calendar weeks with the
+7. **Persistent price cut review:** when the next week's price is observed and
+   remains at or below 105% of the final flagged promotion week's price, set
+   `price_persists` and replace the Continue/Reduce/Stop recommendation with
+   `Possible permanent price change - review`. This is a conservative flag
+   against treating a lasting price cut as a temporary promotion; it does not
+   prove that the retailer intended a permanent change. If the next week is
+   unavailable, the flag is false.
+8. **Post-promotion dip:** compare the two following calendar weeks with the
     baseline weekly unit rate. Report a dip only when both post-promotion weeks
     are present; a negative value means post-promotion sales were below
     baseline. The post-promotion result is diagnostic and does not alter the
