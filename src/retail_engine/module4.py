@@ -23,9 +23,23 @@ SENSITIVITY_UNIT_COST_RATES = (0.50, 0.60, 0.70)
 SENSITIVITY_SALVAGE_RATES = (0.10, 0.20, 0.30)
 PERIOD_HORIZON_VARIANTS = (1, 13, 26)
 HORIZON_VARIANTS = (4, 8, 16)
+SEASON_ENDING_WEEKS = 4
 WEEKS_COVER_THRESHOLD_RULE = (
     "A product is markdown-eligible only when opening-stock weeks cover "
     "strictly exceed the simulated demand horizon."
+)
+ACTION_NO_MARKDOWN = "No markdown - low stock"
+ACTION_HOLD = "Hold price - markdown not profitable"
+ACTION_DEEPER = "Deeper markdown - season ending, stock high"
+ACTION_MARK_DOWN = "Mark down - high stock, weak sales"
+ACTION_RULES = (
+    f"{ACTION_NO_MARKDOWN}: weeks cover does not exceed the horizon. "
+    f"{ACTION_HOLD}: eligible, but 0% has the highest expected margin. "
+    f"{ACTION_DEEPER}: eligible, a markdown is selected, and the remaining "
+    "horizon is at most the season-ending threshold. "
+    f"{ACTION_MARK_DOWN}: eligible and a markdown is selected with more "
+    "weeks remaining. The optimizer sets the depth; actions label which "
+    "business rule applies."
 )
 MARKDOWN_COLUMNS = [f"Markdown_{stage}" for stage in range(1, 5)]
 SALES_COLUMNS = [f"Sales_After_M{stage}" for stage in range(1, 5)]
@@ -40,17 +54,18 @@ INPUT_COLUMNS = [
     *SALES_COLUMNS,
 ]
 OUTPUT_COLUMNS = [
-    "Product_ID",
+    "SKU",
     "Category",
     "Brand",
     "original_price",
     "unit_cost",
     "salvage_value_per_unit",
-    "stock_units",
+    "current_stock",
     "horizon_weeks",
     "historical_sales_period_weeks",
     "weeks_cover",
     "markdown_eligible_by_weeks_cover",
+    "at_risk_unsold",
     "demand_intercept_units_per_week",
     "demand_slope_units_per_week_per_markdown",
     "demand_fit_r_squared",
@@ -58,17 +73,18 @@ OUTPUT_COLUMNS = [
     "recommended_price",
     "predicted_units_per_week",
     "uncapped_horizon_demand",
-    "predicted_units_sold",
-    "leftover_units",
+    "expected_sales",
+    "leftover_inventory",
     "sales_revenue",
     "inventory_cost",
     "salvage_proceeds",
-    "predicted_profit",
+    "expected_margin",
     "fixed_30_markdown",
-    "fixed_30_predicted_profit",
+    "fixed_30_expected_margin",
     "profit_gain_vs_fixed_30",
     "optimal_discount_reference",
     "recommended_minus_optimal_discount",
+    "action",
     "recommendation_status",
     "candidate_markdowns_evaluated",
 ]
@@ -186,6 +202,7 @@ def _simulate_product(
     salvage_rate_of_cost: float,
     optimal_discount_reference: float | None = None,
     historical_sales_period_weeks: int = 1,
+    season_ending_weeks: int = SEASON_ENDING_WEEKS,
 ) -> dict[str, object]:
     curve = _profit_curve(
         product,
@@ -212,23 +229,36 @@ def _simulate_product(
         salvage_rate_of_cost,
         historical_sales_period_weeks,
     ).iloc[0]
+    # Tolerance keeps least-squares rounding from flagging exactly covered stock.
+    at_risk_unsold = bool(
+        curve.loc[curve["markdown"].eq(0.0), "leftover_units"].iloc[0] > 1e-6
+    )
     if not markdown_eligible:
         curve = curve.loc[curve["markdown"].eq(0.0)].reset_index(drop=True)
     best_index = int(curve["predicted_profit"].to_numpy().argmax())
     best = curve.iloc[best_index]
+    if not markdown_eligible:
+        action = ACTION_NO_MARKDOWN
+    elif float(best["markdown"]) == 0.0:
+        action = ACTION_HOLD
+    elif horizon_weeks <= season_ending_weeks:
+        action = ACTION_DEEPER
+    else:
+        action = ACTION_MARK_DOWN
 
     return {
-        "Product_ID": product["Product_ID"],
+        "SKU": product["Product_ID"],
         "Category": product["Category"],
         "Brand": product["Brand"],
         "original_price": float(product["Original_Price"]),
         "unit_cost": float(best["unit_cost"]),
         "salvage_value_per_unit": float(best["salvage_value_per_unit"]),
-        "stock_units": float(product["Stock_Level"]),
+        "current_stock": float(product["Stock_Level"]),
         "horizon_weeks": horizon_weeks,
         "historical_sales_period_weeks": historical_sales_period_weeks,
         "weeks_cover": weeks_cover,
         "markdown_eligible_by_weeks_cover": markdown_eligible,
+        "at_risk_unsold": at_risk_unsold,
         "demand_intercept_units_per_week": float(
             best["demand_intercept_units_per_week"]
         ),
@@ -240,14 +270,14 @@ def _simulate_product(
         "recommended_price": float(best["price"]),
         "predicted_units_per_week": float(best["predicted_units_per_week"]),
         "uncapped_horizon_demand": float(best["uncapped_horizon_demand"]),
-        "predicted_units_sold": float(best["predicted_units_sold"]),
-        "leftover_units": float(best["leftover_units"]),
+        "expected_sales": float(best["predicted_units_sold"]),
+        "leftover_inventory": float(best["leftover_units"]),
         "sales_revenue": float(best["sales_revenue"]),
         "inventory_cost": float(best["inventory_cost"]),
         "salvage_proceeds": float(best["salvage_proceeds"]),
-        "predicted_profit": float(best["predicted_profit"]),
+        "expected_margin": float(best["predicted_profit"]),
         "fixed_30_markdown": float(fixed_30["markdown"]),
-        "fixed_30_predicted_profit": float(fixed_30["predicted_profit"]),
+        "fixed_30_expected_margin": float(fixed_30["predicted_profit"]),
         "profit_gain_vs_fixed_30": float(
             best["predicted_profit"] - fixed_30["predicted_profit"]
         ),
@@ -257,6 +287,7 @@ def _simulate_product(
             if optimal_discount_reference is not None
             else None
         ),
+        "action": action,
         "recommendation_status": (
             "Scenario under assumptions - synthetic data; not validated"
         ),
@@ -272,10 +303,13 @@ def optimize_markdowns(
     max_markdown: float = MAX_MARKDOWN,
     markdown_step: float = MARKDOWN_STEP,
     historical_sales_period_weeks: int = 1,
-) -> tuple[pd.DataFrame, dict[str, int | float]]:
+    season_ending_weeks: int = SEASON_ENDING_WEEKS,
+) -> tuple[pd.DataFrame, dict[str, object]]:
     """Return the maximum-profit markdown per product and deduplication counts."""
     if horizon_weeks <= 0:
         raise ValueError("horizon_weeks must be positive")
+    if season_ending_weeks <= 0:
+        raise ValueError("season_ending_weeks must be positive")
     if historical_sales_period_weeks <= 0:
         raise ValueError("historical_sales_period_weeks must be positive")
     if not 0 < unit_cost_rate < 1:
@@ -328,11 +362,12 @@ def optimize_markdowns(
                 salvage_rate_of_cost,
                 optimal_discount_reference=comparison_value,
                 historical_sales_period_weeks=historical_sales_period_weeks,
+                season_ending_weeks=season_ending_weeks,
             )
         )
     results = pd.DataFrame(recommendations, columns=OUTPUT_COLUMNS)
-    results = results.sort_values("Product_ID", kind="stable").reset_index(drop=True)
-    audit: dict[str, int | float] = {
+    results = results.sort_values("SKU", kind="stable").reset_index(drop=True)
+    audit: dict[str, object] = {
         "source_rows": source_rows,
         "exact_duplicate_rows_removed": int(duplicate_rows_removed),
         "analysis_products": int(len(analysis)),
@@ -345,6 +380,13 @@ def optimize_markdowns(
         "markdown_step": markdown_step,
         "candidate_markdowns_per_product": int(len(markdown_grid)),
         "weeks_cover_threshold_rule": WEEKS_COVER_THRESHOLD_RULE,
+        "season_ending_weeks": season_ending_weeks,
+        "action_rules": ACTION_RULES,
+        "action_counts": {
+            str(action): int(count)
+            for action, count in results["action"].value_counts().items()
+        },
+        "at_risk_unsold_count": int(results["at_risk_unsold"].sum()),
     }
     return results, audit
 
@@ -566,7 +608,7 @@ def _save_sku_profit_curves(
     candidates = results.loc[
         ~np.isclose(results["recommended_markdown"], 0.30)
     ].sort_values(
-        ["profit_gain_vs_fixed_30", "demand_slope_units_per_week_per_markdown", "Product_ID"],
+        ["profit_gain_vs_fixed_30", "demand_slope_units_per_week_per_markdown", "SKU"],
         ascending=[False, False, True],
         kind="stable",
     ).head(5)
@@ -581,7 +623,7 @@ def _save_sku_profit_curves(
         palette,
         strict=False,
     ):
-        product = selected.loc[recommendation["Product_ID"]]
+        product = selected.loc[recommendation["SKU"]]
         curve = _profit_curve(
             product,
             grid,
@@ -590,7 +632,7 @@ def _save_sku_profit_curves(
             SALVAGE_RATE_OF_COST,
             historical_sales_period_weeks,
         )
-        curve.insert(0, "Product_ID", recommendation["Product_ID"])
+        curve.insert(0, "SKU", recommendation["SKU"])
         curve.insert(
             1,
             "scenario_label",
@@ -604,10 +646,10 @@ def _save_sku_profit_curves(
             linewidth=2,
         )
         selected_markdown = recommendation["recommended_markdown"] * 100
-        fixed_profit = float(recommendation["fixed_30_predicted_profit"])
+        fixed_profit = float(recommendation["fixed_30_expected_margin"])
         ax.scatter(
             [selected_markdown],
-            [recommendation["predicted_profit"]],
+            [recommendation["expected_margin"]],
             color=color,
             marker="o",
             label=f"Pick {selected_markdown:.0f}%",
@@ -631,7 +673,7 @@ def _save_sku_profit_curves(
                 label="Optimal Discount reference",
             )
         ax.set_title(
-            f"SKU {recommendation['Product_ID']} ({recommendation['Category']})"
+            f"SKU {recommendation['SKU']} ({recommendation['Category']})"
         )
         ax.set_ylabel("Profit ($, scenario)")
         ax.grid(alpha=0.2)
@@ -677,9 +719,9 @@ def _write_scenario_evidence(
         ~np.isclose(results["recommended_markdown"], 0.30)
     ]
     comparison_table = "\n".join(
-        f"| {row.Product_ID} | {row.Category} | "
-        f"{row.recommended_markdown:.0%} | {row.predicted_profit:,.2f} | "
-        f"{row.fixed_30_predicted_profit:,.2f} | "
+        f"| {row.SKU} | {row.Category} | "
+        f"{row.recommended_markdown:.0%} | {row.expected_margin:,.2f} | "
+        f"{row.fixed_30_expected_margin:,.2f} | "
         f"{row.profit_gain_vs_fixed_30:,.2f} | "
         f"{row.optimal_discount_reference:.0%} |"
         for row in comparison_rows.head(5).itertuples(index=False)
@@ -839,6 +881,7 @@ def build_markdown_recommendations(
     horizon_weeks: int = HORIZON_WEEKS,
     evidence_dir: Path = Path("outputs/module4/evidence"),
     historical_sales_period_weeks: int = 1,
+    season_ending_weeks: int = SEASON_ENDING_WEEKS,
 ) -> pd.DataFrame:
     """Read the D2 CSV, optimize all products, and write results plus audit."""
     if not input_path.is_file():
@@ -849,6 +892,7 @@ def build_markdown_recommendations(
         frame,
         horizon_weeks=horizon_weeks,
         historical_sales_period_weeks=historical_sales_period_weeks,
+        season_ending_weeks=season_ending_weeks,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     sensitivity = markdown_economic_sensitivity(
@@ -961,6 +1005,12 @@ def main() -> None:
         help="Assumed period length for Historical_Sales and Sales_After_Mk",
     )
     parser.add_argument(
+        "--season-ending-weeks",
+        type=int,
+        default=SEASON_ENDING_WEEKS,
+        help="Horizons at or below this many weeks count as season ending soon",
+    )
+    parser.add_argument(
         "--evidence-dir",
         type=Path,
         default=Path("outputs/module4/evidence"),
@@ -973,12 +1023,14 @@ def main() -> None:
         horizon_weeks=args.horizon_weeks,
         evidence_dir=args.evidence_dir,
         historical_sales_period_weeks=args.historical_sales_period_weeks,
+        season_ending_weeks=args.season_ending_weeks,
     )
     print(f"Products optimized: {len(results):,}")
     print(
         "Recommended markdown distribution:\n"
         + results["recommended_markdown"].value_counts().sort_index().to_string()
     )
+    print("Actions:\n" + results["action"].value_counts().to_string())
     print(f"Recommendations: {args.output_dir / 'markdown_recommendations.csv'}")
     print(f"Audit: {args.output_dir / 'markdown_recommendations_audit.json'}")
     print(f"Evidence: {args.evidence_dir / 'markdown_scenario_evidence.md'}")

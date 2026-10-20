@@ -245,7 +245,21 @@ account for this measurement limitation.
       increments. Multiply fitted weekly demand by the horizon, cap total
       sales at `Stock_Level`, then calculate scenario profit as sales revenue
       plus salvage proceeds on leftover opening stock minus cost of all
-      opening stock. Ties choose the lower markdown.
+      opening stock. Ties choose the lower markdown. This scenario profit is
+      reported as `expected_margin`; units sold are `expected_sales` and
+      unsold opening stock is `leftover_inventory`.
+    - **Business-rule actions (scenario policy):** D2 has no dates, so the
+      simulated horizon stands in for weeks remaining in the season, and
+      "season ending soon" means a horizon of at most four weeks
+      (`--season-ending-weeks`). Each SKU receives one `action`:
+      `No markdown - low stock` when it is not weeks-cover eligible;
+      `Hold price - markdown not profitable` when eligible but 0% has the
+      highest expected margin; `Deeper markdown - season ending, stock high`
+      when eligible, a markdown is selected, and the season is ending soon;
+      otherwise `Mark down - high stock, weak sales`. The optimizer sets the
+      depth; the action labels which rule applies and never forces a deeper
+      markdown than the profit maximum. `at_risk_unsold` is true when the
+      fitted demand at 0% leaves opening stock unsold by the horizon end.
     - Compare the selected markdown against a fixed 30% markdown using the
       same demand curve and economics. Include the source `Optimal Discount`
       only as a clearly labelled comparison reference; never use it in

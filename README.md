@@ -304,7 +304,13 @@ optimize-markdowns --historical-sales-period-weeks 13 --horizon-weeks 8
 The command removes exact duplicate input rows, rejects conflicting duplicate
 product IDs, and writes each product's maximum-predicted-profit markdown to
 `data/processed/module4/markdown_recommendations.csv` along with an assumptions
-and provenance audit JSON. Because the dataset is synthetic and its stage
+and provenance audit JSON. The CSV uses the brief's fields (`SKU`,
+`current_stock`, `weeks_cover`, `recommended_markdown`, `expected_sales`,
+`expected_margin`, `leftover_inventory`, `action`) plus an `at_risk_unsold`
+flag. `action` labels which business rule applies: no markdown for low stock,
+hold when a markdown does not pay, mark down for high stock and weak sales, or
+deeper markdown when the horizon is within `--season-ending-weeks` (default 4).
+Because the dataset is synthetic and its stage
 durations and stock measurement horizon are undocumented, the outputs are
 scenario results under these assumptions, not validated retail
 recommendations. The audit includes fixed-30% comparisons only where the

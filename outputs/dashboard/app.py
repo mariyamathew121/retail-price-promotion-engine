@@ -464,10 +464,14 @@ def module4_page() -> None:
         lambda value: f"{value:.0%}"
     )
     bar_chart(distribution, "markdown_label", "products", COLORS["blue"])
+    if "action" in data.columns:
+        st.markdown("#### Business-rule actions")
+        actions = data["action"].value_counts().rename_axis("action").rename("products").reset_index()
+        bar_chart(actions, "action", "products", COLORS["purple"])
     st.markdown("#### Scenario profit summary")
     cards(
         [
-            ("Median predicted profit", f"${data['predicted_profit'].median():,.2f}", "Cost and salvage are assumptions", "purple"),
+            ("Median expected margin", f"${data['expected_margin'].median():,.2f}", "Cost and salvage are assumptions", "purple"),
             ("Median stock cover", f"{data['weeks_cover'].replace([float('inf')], pd.NA).median():.2f} weeks", "Stock ÷ assumed weekly sales", "blue"),
             ("Cover ≤ horizon", f"{below_horizon.mean():.1%}", "Policy holds at 0% markdown", "orange"),
             ("Markdown-eligible", format_number(data["markdown_eligible_by_weeks_cover"].astype(str).str.lower().eq("true").sum()), "Strictly greater cover than horizon", "pink"),
