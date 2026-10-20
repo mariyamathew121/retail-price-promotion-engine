@@ -204,6 +204,24 @@ diagnostic notes with:
 py -3.10 outputs/module2/generate_positive_elasticity_cases.py
 ```
 
+### Same-item stability across stores
+
+After `estimate-price-elasticity`, compare each item's per-SKU estimates across
+the stores where it was estimated:
+
+```powershell
+py -3.10 -m pip install -e ".[dev]"
+module2-same-item-stability
+```
+
+This reads `data/processed/module2/price_elasticities.csv` and writes
+`data/processed/module2/same_item_store_stability.csv` for items estimated in two
+or more stores. Each row gives the elasticity range, sign agreement across
+stores, the modal demand type and how often stores agree with it, and whether
+all the stores' 95% intervals share a common value. It is a descriptive
+diagnostic: a store-level spread can reflect real differences or estimation
+noise, and the table does not decide which.
+
 ### Module 2 validation
 
 Install the optional DoubleML validation dependency and download the C1
