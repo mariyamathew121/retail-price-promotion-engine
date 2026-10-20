@@ -158,3 +158,125 @@ account for this measurement limitation.
     are present; a negative value means post-promotion sales were below
     baseline. The post-promotion result is diagnostic and does not alter the
     promotion recommendation.
+
+## Module 4 — markdown dataset audit
+
+1. **Source and synthetic status:** the D2 CSV is treated as a synthetic
+   modelling example, not representative evidence of real retailer behavior.
+   The audit records the source-file SHA-256, dimensions, missingness, numeric
+   ranges, duplicate rows, and stage-to-stage movements in
+   `outputs/module4/markdown_dataset_audit.md`.
+2. **Duplicate handling:** the raw file is preserved. Exact duplicate rows may
+   be removed from an analysis copy; `Product_ID` alone is not a safe key until
+   repeated identifiers have been checked for conflicting values.
+3. **Markdown interpretation:** the `Markdown_1`–`Markdown_4` values are
+   provisionally treated as discount fractions because they fall between 0
+   and 1. The file has no data dictionary or dates, and adjacent markdown
+   values are not consistently increasing. Do not interpret M1–M4 as a
+   chronological markdown path until stage meaning and timing are confirmed.
+4. **Sales interpretation:** `Historical_Sales` and `Sales_After_M1` through
+   `Sales_After_M4` are not assumed to be weekly or equal-duration measures.
+   Their observation windows are undocumented, so stage-to-stage differences
+   are exploratory associations rather than causal uplift.
+5. **Target leakage:** `Optimal Discount` is a supplied target/benchmark. It
+   must not be included as a model input when estimating or predicting a
+   discount choice or its sales response. Its derivation and validity are not
+   documented.
+6. **Stock and profit limits:** the source does not document the measurement
+   timing/unit of `Stock_Level`; sales after M4 exceed stock in many rows.
+   The Module 4 optimizer therefore uses stock as opening inventory and uses
+   the cost/salvage values listed below as scenario assumptions only.
+7. **Scope:** the dataset alone cannot establish a time-based optimizer,
+   clearance outcome, realized profit, or ROI. The Module 4 output is a
+   conditional simulation under explicit assumptions, not a validated retail
+   recommendation. Real deployment requires dated outcomes, documented stage
+   durations, aligned inventory periods, and observed unit costs/margins.
+8. **Exploratory sales response:** for the initial D2 summary only, pair
+   `Markdown_i` with `Sales_After_Mi` and calculate relative difference from
+   `Historical_Sales`. Remove exact duplicate rows from this analysis copy,
+   retain the source unchanged, and group markdown values into five
+   data-derived quantiles. This is descriptive, not causal; `Optimal Discount`
+   is excluded to prevent target leakage.
+9. **Predictive diagnostic:** compare a metadata-only Extra Trees model with
+   the same model plus one matched markdown field, using a fixed 80/20
+   product-level split and relative sales difference as the target. Exclude
+   IDs, other stage outcomes/markdowns, `Optimal Discount`, and fields of
+   unclear timing. Held-out scores measure prediction within this synthetic
+   dataset only; they are not causal elasticities, ROI, or pricing guidance.
+10. **Markdown simulation assumptions (scenario defaults, not D2 facts):**
+    - The dataset does not document the measurement period for `Historical_Sales`
+      or matched stage sales. The primary rerun assumes `Historical_Sales` and
+      each matched `Sales_After_Mk` are units per week. Sensitivity scenarios
+      divide both values by assumed periods of 13 or 26 weeks before fitting.
+    - Unit cost is 60% of `Original_Price`; salvage value is 20% of unit cost.
+    - The demand horizon is eight weeks.
+    - Fit a separate ordinary least-squares linear demand curve for each
+      deduplicated product using the four matched markdown/sales pairs plus
+      `(0, Historical_Sales)` after dividing sales by the assumed measurement
+      period. Floor negative predicted weekly demand at zero.
+    - **Weeks-cover eligibility rule (scenario policy):** calculate
+      `weeks_cover = Stock_Level / assumed_weekly_baseline_sales`. Only allow a
+      markdown if this is strictly greater than the simulated horizon; hold at
+      0% otherwise. Equality is not eligible. This conservative guard is a
+      policy assumption, not a data-derived threshold.
+    - Evaluate markdowns from 0% through 50% inclusive in 10-percentage-point
+      increments. Multiply fitted weekly demand by the horizon, cap total
+      sales at `Stock_Level`, then calculate scenario profit as sales revenue
+      plus salvage proceeds on leftover opening stock minus cost of all
+      opening stock. Ties choose the lower markdown.
+    - Compare the selected markdown against a fixed 30% markdown using the
+      same demand curve and economics. Include the source `Optimal Discount`
+      only as a clearly labelled comparison reference; never use it in
+      fitting, prediction, or optimization. Compare profit only for products
+      whose selected markdown differs from 30%; do not report a portfolio-wide
+      profit-gap headline.
+    - Recompute picks for all nine combinations of unit cost at 50%, 60%, or
+      70% of original price and salvage at 10%, 20%, or 30% of unit cost.
+      This economic sensitivity uses the 13-week sales-period / 8-week horizon
+      scenario and reports recommendation changes relative to its default
+      60%/20% case. Separately evaluate all combinations of assumed historical
+      sales periods (1, 13, 26 weeks) and horizons (4, 8, 16 weeks).
+    - Remove exact duplicate rows from the analysis input; reject repeated
+      `Product_ID` values with conflicting records. Preserve the raw CSV.
+    These are explicit scenario assumptions for an educational simulation,
+    not facts provided by D2 or validated operating guidance.
+
+## Module 5 — Instacart market basket analysis
+
+1. **Basket grain:** treat one `order_id` as one basket and a product as present
+   at most once in that basket. `order_products__prior.csv` is the historical
+   association-discovery source; `order_products__train.csv` is kept separate
+   as a held-out order set for checking pair co-occurrence outside discovery.
+2. **Interpretation:** support, confidence, lift, or other association scores
+   describe co-occurrence only. They do not establish that a bundle,
+   cross-sell, or promotion causes incremental purchases or profit.
+3. **Support sensitivity and working shortlist:** compare prior-order support
+   thresholds of 0.10%, 0.25%, and 0.50%; use 0.25% as the provisional
+   downstream shortlist threshold because it reduces the lowest-threshold
+   candidate set while retaining a substantial share of its prior pair-event
+   mass. Preserve the 0.10% candidates for broader discovery. Final candidates
+   must also have prior lift strictly greater than 1.5. Rank by prior lift,
+   then maximum directional confidence, then prior support. Report the share
+   whose train lift also stays strictly above 1.5 and the Pearson correlation
+   between prior and train lift when both are defined.
+4. **Validation limit:** `train` orders are held out by order, not by user.
+   The train users also appear in the prior history, so validation measures
+   pair repeatability for partly familiar customers, not generalization to
+   entirely unseen users.
+5. **FP-Growth cross-check:** use mlxtend FP-Growth on a deterministic sample
+   of 100,000 prior orders to cross-check three high-ranked pair supports
+   against direct counts. Limit its basket columns to the six products in
+   those three pairs to keep memory bounded; retain all sampled orders in the
+   support denominator.
+6. **M5 department mapping (assumption):** map `household` to `HOUSEHOLD`;
+   map `bakery`, `beverages`, `breakfast`, `bulk`, `canned goods`, `dairy
+   eggs`, `deli`, `dry goods pasta`, `frozen`, `international`, `meat
+   seafood`, `pantry`, `produce`, and `snacks` to `FOODS`. Leave `alcohol`,
+   `babies`, `missing`, `other`, `personal care`, and `pets` unmapped. Assign
+   a pair-level `m5_category` only when both products map to the same category;
+   otherwise leave it blank. This is a working taxonomy crosswalk, not an
+   official Instacart-to-M5 mapping.
+7. **Cross-price caveat (P3):** “bought together” is not evidence that one
+   product's price changes demand for the other. Association rules do not
+   identify cross-price elasticity, complementarity, or causal bundle uplift.
+   Require cross-price/causal validation before pricing or promotion action.

@@ -40,9 +40,13 @@ with `estimate-promotion-uplift`.
 
 Among complete episodes, median duration was five weeks; the 75th percentile
 was eight weeks. These are runs in the Module 1 price-drop proxy, not verified
-retailer campaigns. About 20.1% of complete episodes had a zero-unit baseline,
-so sparse-history and inventory context should be checked before acting.
-The two post-promotion weeks were available for 98.8% of complete episodes.
+retailer campaigns. Of 16,253 complete episodes, 3,271 (20.1%) had a zero-unit
+baseline, and 6,806 (41.9%) had promotion sales at or below baseline sales.
+These sparse/weak-sales cases are frequent enough to affect segment medians;
+in particular, median ROI values of -1.000 should not be read as evidence of a
+generalizable campaign effect. Check sparse-history and inventory context
+before acting. The two post-promotion weeks were available for 98.8% of
+complete episodes.
 
 ## Hand-calculated checks
 
@@ -107,6 +111,10 @@ band has a negative median ROI; the deeper discount bands have more negative
 medians than the shallowest band. This is consistent with discount cost
 eroding incremental contribution, but it does not establish causal effects:
 promotions are inferred from price drops and costs/margins are assumptions.
+Interpret the -1.000 medians alongside the data-quality rates above: 20.1% of
+complete episodes have zero baseline units, and 41.9% have promotion sales no
+higher than baseline. The sparse and non-incremental observations are
+substantial and can make the segment summaries sensitive to low-volume rows.
 The filtered recommendation counts are 1,248 Continue, 3,571 Reduce discount,
 and 4,664 Stop.
 

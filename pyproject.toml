@@ -10,6 +10,7 @@ requires-python = ">=3.10"
 dependencies = [
     "duckdb>=1.1",
     "matplotlib>=3.7",
+    "mlxtend>=0.23",
     "pandas>=2.0",
     "pyarrow>=14.0",
     "pyfixest>=0.60",
@@ -23,6 +24,10 @@ dev = [
 validation = [
     "doubleml>=0.10.1",
 ]
+dashboard = [
+    "altair>=5.0",
+    "streamlit>=1.40",
+]
 
 [project.scripts]
 build-retail-data = "retail_engine.module1:main"
@@ -30,6 +35,8 @@ estimate-price-elasticity = "retail_engine.module2:main"
 estimate-pooled-elasticity = "retail_engine.module2_pooled:main"
 validate-module2 = "retail_engine.module2_validation:main"
 estimate-promotion-uplift = "retail_engine.module3:main"
+optimize-markdowns = "retail_engine.module4:main"
+estimate-bundles = "retail_engine.module5:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

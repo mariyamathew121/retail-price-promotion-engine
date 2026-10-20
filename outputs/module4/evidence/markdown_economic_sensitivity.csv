@@ -1,0 +1,10 @@
+scenario_label,unit_cost_rate,salvage_rate_of_cost,historical_sales_period_weeks,horizon_weeks,product_count,recommendation_changed_count_vs_60_20,recommendation_changed_share_vs_60_20,mean_recommended_markdown,median_recommended_markdown
+Scenario under assumptions - synthetic data,0.5,0.1,13,8,43400,2350,0.05414746543778802,0.0503778801843318,0.0
+Scenario under assumptions - synthetic data,0.5,0.2,13,8,43400,714,0.016451612903225808,0.04660829493087557,0.0
+Scenario under assumptions - synthetic data,0.5,0.3,13,8,43400,1068,0.024608294930875577,0.04250230414746543,0.0
+Scenario under assumptions - synthetic data,0.6,0.1,13,8,43400,2036,0.04691244239631336,0.049654377880184335,0.0
+Scenario under assumptions - synthetic data,0.6,0.2,13,8,43400,0,0.0,0.044963133640552995,0.0
+Scenario under assumptions - synthetic data,0.6,0.3,13,8,43400,2183,0.05029953917050691,0.0399331797235023,0.0
+Scenario under assumptions - synthetic data,0.7,0.1,13,8,43400,1684,0.03880184331797235,0.04884331797235023,0.0
+Scenario under assumptions - synthetic data,0.7,0.2,13,8,43400,722,0.016635944700460828,0.04329953917050691,0.0
+Scenario under assumptions - synthetic data,0.7,0.3,13,8,43400,3333,0.07679723502304148,0.037283410138248846,0.0

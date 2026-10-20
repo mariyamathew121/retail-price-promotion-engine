@@ -188,6 +188,54 @@ financial assumptions are documented in
 `assumptions.md`; first-run totals and hand calculations are in
 `outputs/module3/promotion_uplift_summary.md`.
 
+### Module 4: markdown dataset audit
+
+Place D2 at `data/raw/markdown/SYNTHETIC Markdown Dataset.csv`, then run the
+data audit from the project root:
+
+```powershell
+py -3.10 outputs/module4/audit_markdown_dataset.py
+```
+
+The script records the source SHA-256, missingness, duplicates, ranges, and
+stage-field movements. It writes the review report to
+`outputs/module4/markdown_dataset_audit.md` and a machine-readable JSON to
+`data/processed/module4/markdown_dataset_audit.json`. The source describes
+itself as synthetic; fields have no dates or documented measurement horizons.
+The simulator below uses user-specified scenario assumptions for cost, stock,
+and the demand horizon; its output is not a validated business
+recommendation. Module 4 assumptions and limits are in
+[assumptions.md](assumptions.md).
+
+The markdown simulator uses labelled scenario assumptions documented in
+`assumptions.md`: its default interpretation is weekly historical and matched
+stage sales, unit cost is 60% of original price, salvage is 20% of unit cost,
+and the demand horizon is eight weeks. Because D2 does not document its sales
+measurement period, the evidence run also tests 13- and 26-week period
+assumptions against 4-, 8-, and 16-week horizons. Markdown choices use a
+0/10/20/30/40/50% grid and are allowed only when stock cover strictly exceeds
+the simulated horizon. These are scenario assumptions, not data facts. Run:
+
+```powershell
+optimize-markdowns --historical-sales-period-weeks 13 --horizon-weeks 8
+```
+
+13 weeks is an illustrative assumption; D2 does not document the sales period. See the period/horizon sensitivity table.
+
+The command removes exact duplicate input rows, rejects conflicting duplicate
+product IDs, and writes each product's maximum-predicted-profit markdown to
+`data/processed/module4/markdown_recommendations.csv` along with an assumptions
+and provenance audit JSON. Because the dataset is synthetic and its stage
+durations and stock measurement horizon are undocumented, the outputs are
+scenario results under these assumptions, not validated retail
+recommendations. The audit includes fixed-30% comparisons only where the
+selected markdown differs, and an `Optimal Discount` reference column that is
+never used by the model. Evidence includes five SKU profit curves, a 3×3
+cost/salvage sensitivity, and all nine period/horizon variants in
+`outputs/module4/evidence/`; each is labelled “scenario under assumptions” to
+reflect the synthetic source. Pass `--historical-sales-period-weeks 13` or `26`
+to run the recommendation CSV under either alternate period assumption.
+
 ## Module status and roadmap
 
 1. **Data foundation:** clean M5 item-store-day table (implemented).
@@ -197,11 +245,51 @@ financial assumptions are documented in
    C1/DoubleML validation complete; interpretation and limits are documented).
 3. **Promotion uplift:** estimated incremental units and profit against a
    documented baseline, with a two-week post-promotion dip check (implemented).
-4. **Markdown optimization:** simulate markdown choices and leftover salvage
-   value using the separate markdown dataset.
+4. **Markdown optimization:** D2 source audited; a labelled-assumption
+   product-level scenario simulator is implemented. Validated time-based,
+   inventory, and profit optimization still require better field definitions
+   and additional data.
 5. **Market basket and bundles:** mine Instacart associations and mark
    cross-promotion validation as required rather than treating association as
    causal evidence.
 
 Each module should retain its runnable source, derived outputs, and assumptions
 so that every recommendation can be traced to data and code.
+
+### Module 5: Instacart bundles and market basket analysis
+
+Place the Instacart CSV files in `data/raw/instacart/`, install the project
+dependencies, and run the bundle-candidate workflow:
+
+```powershell
+pip install -e .
+estimate-bundles
+```
+
+The CLI runs from `src/retail_engine/module5.py` and writes
+`data/processed/module5/bundle_candidates.csv`, the support/lift sensitivity
+summary, a source audit, a report, and an mlxtend FP-Growth cross-check. It
+defaults to at least 0.25% prior-order support and prior lift strictly above
+1.5; override with `--min-support` or `--min-lift`. Three ranked pairs are
+cross-checked against mlxtend FP-Growth on a deterministic 100,000-prior-order
+sample. The department-to-M5 category crosswalk and validation caveats are
+documented in [assumptions.md](assumptions.md).
+
+“Bought together” is descriptive co-occurrence, not evidence that the products
+respond to each other's price changes. Association does not establish
+cross-price elasticity or causal bundle uplift; validate before acting.
+
+### Local dashboard
+
+Install the optional dashboard dependency and launch the five-tab dashboard
+from the project root:
+
+```powershell
+py -3.10 -m pip install -e ".[dashboard]"
+py -3.10 -m streamlit run outputs/dashboard/app.py --server.address 127.0.0.1
+```
+
+The app reads existing audit JSON, CSV, Parquet references, and interpretation
+artifacts under `data/processed/` and `outputs/`; it does not regenerate model
+outputs. Each module page shows its source files and limitations. Charts use
+blue, purple, orange, pink, and red accents only.

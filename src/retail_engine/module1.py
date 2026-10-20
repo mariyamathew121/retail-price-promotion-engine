@@ -83,7 +83,7 @@ def _add_rolling_regular_prices(prices: pd.DataFrame) -> pd.DataFrame:
         .max()
         .reset_index(level=list(range(len(PRICE_KEYS[:2]))), drop=True)
     )
-    regular_prices = rolling_max.to_numpy()
+    regular_prices = rolling_max.to_numpy().copy()
     has_price_history = np.isfinite(regular_prices)
     regular_prices[~has_price_history] = prices["sell_price"].to_numpy()[
         ~has_price_history
