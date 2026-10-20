@@ -42,6 +42,12 @@ account for this measurement limitation.
 1. **Time grain:** aggregate daily sales to Saturday–Friday weeks, matching the
    weekly price grain in M5. Prices are averaged within the week; they should be
    constant for a SKU-store M5 week.
+
+   The brief lists weekday, month, store and category as controls. The
+   per-series model is weekly, so weekday does not apply; month is captured by
+   annual sine/cosine seasonality; store and category are constant within a
+   single item-store series. The pooled model absorbs store and item effects
+   through fixed effects.
 2. **Eligibility:** select up to 100 item-store combinations by total units
    sold, requiring at least 104 observed weeks, 52 positive-sales weeks, three
    distinct prices, and a maximum/minimum price range of at least 5%. These

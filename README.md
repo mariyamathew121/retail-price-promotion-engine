@@ -1,20 +1,72 @@
 # Retail Price & Promotion Decision Engine
 
-A reproducible, data-backed project for retail pricing and promotion analysis.
-The first milestone builds the shared item-store-day table from M5 and records
-the assumptions, row counts, and promotion-proxy spot checks used to make it.
+An end-to-end, reproducible retail analytics prototype for price, promotion,
+markdown, and bundle decisions using M5, D2, and Instacart data. It produces
+audited datasets, model diagnostics, and reviewable recommendations—not
+automatic commercial actions.
+
+## Limitations
+
+- M5 has no promotion label; promotions are inferred from historical price drops.
+- Promotion margin rates, markdown cost/salvage values, thresholds, and other
+  business rules are documented assumptions, not observed facts.
+- D2 identifies itself as synthetic and lacks documented sales and inventory
+  measurement periods; markdown recommendations are scenarios, not validated
+  retail outcomes.
+- M5 elasticity estimates are observational and can be affected by unmeasured
+  confounding; pooled defaults are department-level, not SKU-specific.
+- Instacart contains no prices. Bundle candidates are associations and need
+  cross-price validation before pricing or promotion decisions.
 
 ## Project layout
 
 ```text
 data/
-  raw/                 Put the three M5 CSV files here (not committed)
+  raw/                 M5 CSVs here; D2 and Instacart in documented subfolders
   processed/           Generated Parquet and audit outputs (not committed)
 outputs/               Review plots and query benchmark records
 src/retail_engine/     Reusable analysis code and command-line entry point
 tests/                 Focused automated tests
 assumptions.md          Business and modelling assumptions
 ```
+
+## Reproducing results
+
+The raw and processed data are excluded from Git. Download the datasets from
+their original sources and place the files as follows:
+
+- **M5 (D1):** join the competition, accept its rules, and download
+  [M5 Forecasting Accuracy](https://www.kaggle.com/competitions/m5-forecasting-accuracy/data).
+  Put `sales_train_evaluation.csv`, `sell_prices.csv`, and `calendar.csv` in
+  `data/raw/`.
+- **Markdown (D2):** download the
+  [Retail Markdown Optimization dataset](https://www.kaggle.com/datasets/arbaaztamboli/retail-markdown-optimization-discounts-and-sales).
+  Put the CSV at `data/raw/markdown/SYNTHETIC Markdown Dataset.csv`.
+- **Instacart (D3):** download the
+  [Instacart Market Basket Analysis dataset](https://www.kaggle.com/datasets/psparks/instacart-market-basket-analysis).
+  Put `orders.csv`, `order_products__prior.csv`,
+  `order_products__train.csv`, `products.csv`, `aisles.csv`, and
+  `departments.csv` in `data/raw/instacart/`.
+
+From an activated project virtual environment, install the project and run the
+pipelines in dependency order:
+
+```powershell
+py -m pip install -e ".[dev]"
+build-retail-data
+estimate-price-elasticity
+estimate-pooled-elasticity --max-series 10000 --by-store
+estimate-promotion-uplift
+optimize-markdowns --historical-sales-period-weeks 13 --horizon-weeks 8
+estimate-bundles
+```
+
+Module 1 is the longest step: it reshapes tens of millions of daily rows.
+Allow several GB of free memory and use `build-retail-data --chunk-skus 32` if
+the default SKU batch size exceeds available memory. Module 4 results are
+scenario outputs under documented assumptions; Module 5 results are
+descriptive and do not replace cross-price validation. The optional C1
+DoubleML validation workflow is documented separately under Module 2.
 
 ## Module 1: data foundation
 
@@ -136,7 +188,9 @@ selected series and an audit JSON are written to
 size. Eligibility rules and limitations are recorded in
 [assumptions.md](assumptions.md).
 
-Module 2 interpretation artifacts, including the naive/DML/pooled comparison,
+Module 2 interpretation artifacts, including the generated naive/DML/pooled
+comparison, the authored
+[`module2_interpretation.md`](outputs/module2/module2_interpretation.md),
 category medians, and positive-elasticity diagnostic plots, are in
 `outputs/module2/`. Recreate the five largest positive-series plots and their
 diagnostic notes with:
@@ -220,7 +274,8 @@ the simulated horizon. These are scenario assumptions, not data facts. Run:
 optimize-markdowns --historical-sales-period-weeks 13 --horizon-weeks 8
 ```
 
-13 weeks is an illustrative assumption; D2 does not document the sales period. See the period/horizon sensitivity table.
+> 13 weeks is an illustrative assumption; D2 does not document the sales
+> period. See the period/horizon sensitivity table.
 
 The command removes exact duplicate input rows, rejects conflicting duplicate
 product IDs, and writes each product's maximum-predicted-profit markdown to
@@ -280,6 +335,13 @@ respond to each other's price changes. Association does not establish
 cross-price elasticity or causal bundle uplift; validate before acting.
 
 ### Local dashboard
+
+The standalone dashboard is available at `outputs/dashboard/index.html`. Open
+it directly in a browser; it has no build step or external runtime
+dependencies. It presents a snapshot of the generated project artifacts, with
+module-specific source paths and limitations. Its figures are embedded from
+the documented run outputs and will not refresh automatically when those
+outputs change.
 
 Install the optional dashboard dependency and launch the five-tab dashboard
 from the project root:
