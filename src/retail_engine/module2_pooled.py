@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pyfixest as pf
 
-from retail_engine.module2 import WEEK_START_SQL
+from retail_engine.module2 import WEEK_START_SQL, classify_elasticity
 
 MIN_WEEKS = 104
 MIN_POSITIVE_WEEKS = 52
@@ -176,12 +176,7 @@ def _fit_department(group: pd.DataFrame) -> dict[str, object]:
     }
 
 
-def _pooled_action(elasticity, lower, upper):
-    if upper < -1:
-        return "Price-sensitive", "Test a controlled discount or promotion"
-    if upper < 0:
-        return "Less sensitive", "Protect price or test a small increase"
-    return "Unclear", "Flag for review; take no pricing action"
+_pooled_action = classify_elasticity
 
 
 def _build_item_store_recommendations(

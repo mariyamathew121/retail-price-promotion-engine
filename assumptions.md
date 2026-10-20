@@ -74,9 +74,13 @@ account for this measurement limitation.
    Unobserved inventory constraints, price-setting decisions, and the inferred
    promotion proxy can bias the estimates. Recommendations are test hypotheses,
    not automatic price changes.
-7. **Action threshold:** apply the supplied business rules only when the DML
-   confidence interval excludes zero. Positive or statistically unclear
-   estimates are marked unclear and receive no action.
+7. **Action threshold:** one shared rule (`classify_elasticity`) is applied to
+   both the per-SKU DML estimate and the pooled department estimate, using the
+   upper 95% confidence bound. Price-sensitive requires the whole interval to
+   be below -1; less sensitive requires the upper bound to be below 0 (the
+   interval excludes zero but may reach -1). Otherwise the estimate is marked
+   unclear and receives no action. Any positive estimate has an upper bound
+   above zero, so it is always unclear.
 8. **Reference validation and limits:** the C1 partialling-out DoubleML
    exercise was run on its separate 10,000-row Online Retail example with
    linear, LassoCV, random-forest, and histogram-gradient-boosting nuisance

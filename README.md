@@ -184,8 +184,10 @@ The `--by-store` option also fits department models separately within each
 store. Per-item-store pricing defaults use the pooled department PPML estimate;
 these are department-level defaults attached to item-store rows, not
 SKU-specific elasticity estimates. A series is called price-sensitive only
-when the upper 95% CI bound is below -1. The individual DML result is retained
-only as a review flag and does not override the default action. Results, the
+when the upper 95% CI bound is below -1. The per-SKU DML estimate uses the same
+rule (`classify_elasticity` in `module2.py`), so both paths give the same label
+for the same interval. The individual DML result is retained only as a review
+flag and does not override the default action. Results, the
 selected series and an audit JSON are written to
 `data/processed/module2_pooled/`. Use `--max-series` to change the subset
 size. Eligibility rules and limitations are recorded in

@@ -215,16 +215,25 @@ def _interval(estimate: float, standard_error: float) -> tuple[float, float]:
     )
 
 
-def _recommendation(
+def classify_elasticity(
     elasticity: float, lower: float, upper: float
 ) -> tuple[str, str]:
-    if lower <= 0 <= upper:
-        return "Unclear", "Flag for review; take no pricing action"
-    if elasticity > 0:
-        return "Unclear", "Flag for review; take no pricing action"
-    if elasticity < -1:
+    """Shared demand-type rule for per-SKU DML and pooled department estimates.
+
+    Price-sensitive only when the whole 95% interval is below -1; less
+    sensitive when the interval is below 0 but may reach -1; otherwise
+    unclear. A positive estimate, or an interval that includes zero, is
+    never acted on. `elasticity` is kept for the caller's signature and does
+    not affect the class.
+    """
+    if upper < -1:
         return "Price-sensitive", "Test a controlled discount or promotion"
-    return "Less sensitive", "Protect price or test a small increase"
+    if upper < 0:
+        return "Less sensitive", "Protect price or test a small increase"
+    return "Unclear", "Flag for review; take no pricing action"
+
+
+_recommendation = classify_elasticity
 
 
 def _estimate_combination(

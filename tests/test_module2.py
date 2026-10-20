@@ -7,6 +7,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from retail_engine.module2 import (
+    classify_elasticity,
     _calendar_week_numbers,
     _crossfit_dml,
     _hac_standard_error,
@@ -152,3 +153,27 @@ def test_calendar_week_numbers_match_positions_without_gaps():
     weeks = pd.Series(pd.date_range("2015-01-03", periods=6, freq="7D"))
 
     np.testing.assert_array_equal(_calendar_week_numbers(weeks), np.arange(6))
+
+
+@pytest.mark.parametrize(
+    ("estimate", "lower", "upper", "demand_type"),
+    [
+        (-3.0, -4.0, -2.0, "Price-sensitive"),
+        (-1.5, -2.5, -0.5, "Less sensitive"),  # point below -1, interval reaches -0.5
+        (-0.4, -0.9, -0.1, "Less sensitive"),
+        (-2.0, -5.0, 1.0, "Unclear"),  # interval includes zero
+        (0.8, 0.2, 1.4, "Unclear"),  # significantly positive
+        (0.3, -0.2, 0.8, "Unclear"),
+        (-1.0, -2.0, -1.0, "Less sensitive"),  # upper bound exactly -1 is not below -1
+    ],
+)
+def test_classification_uses_confidence_interval_upper_bound(
+    estimate, lower, upper, demand_type
+):
+    assert classify_elasticity(estimate, lower, upper)[0] == demand_type
+
+
+def test_pooled_and_per_sku_classification_share_one_rule():
+    from retail_engine.module2_pooled import _pooled_action
+
+    assert _pooled_action is classify_elasticity
