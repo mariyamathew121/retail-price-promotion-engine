@@ -1,29 +1,29 @@
 price_persists: 6980 of 16749
 depth_band
-(0.1, 0.15]    -0.188951
-(0.15, 0.25]   -0.764046
-(0.25, 0.4]    -1.000000
+(0.1, 0.15]    -0.135159
+(0.15, 0.25]   -0.754427
+(0.25, 0.4]    -1.011174
 (0.4, 1.0]     -1.000000
 Name: promotion_ROI, dtype: float64
 cat_id
-FOODS       -0.948191
-HOBBIES     -1.077419
-HOUSEHOLD   -0.967515
+FOODS       -0.944845
+HOBBIES     -1.090323
+HOUSEHOLD   -1.000000
 Name: promotion_ROI, dtype: float64
 store_id
-CA_1   -0.694643
-CA_2   -0.513628
-CA_3   -1.547803
-CA_4   -0.567083
+CA_1   -0.688611
+CA_2   -0.508238
+CA_3   -1.544531
+CA_4   -0.560328
 TX_1   -1.000000
-TX_2   -0.953285
+TX_2   -0.983445
 TX_3   -1.000000
-WI_1   -0.885072
+WI_1   -0.886271
 WI_2   -0.798177
-WI_3   -0.810309
+WI_3   -0.785313
 Name: promotion_ROI, dtype: float64
 recommendation
-Continue promotion    1248
-Reduce discount       3571
-Stop promotion        4664
+Continue promotion    1239
+Reduce discount       3276
+Stop promotion        4441
 dtype: int64

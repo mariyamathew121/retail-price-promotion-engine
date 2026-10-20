@@ -24,6 +24,9 @@ dev = [
 validation = [
     "doubleml>=0.10.1",
 ]
+uplift = [
+    "causalml>=0.15",
+]
 dashboard = [
     "altair>=5.0",
     "streamlit>=1.40",
@@ -35,6 +38,7 @@ estimate-price-elasticity = "retail_engine.module2:main"
 estimate-pooled-elasticity = "retail_engine.module2_pooled:main"
 validate-module2 = "retail_engine.module2_validation:main"
 estimate-promotion-uplift = "retail_engine.module3:main"
+estimate-promotion-tlearner = "retail_engine.module3_causalml:main"
 optimize-markdowns = "retail_engine.module4:main"
 estimate-bundles = "retail_engine.module5:main"
 

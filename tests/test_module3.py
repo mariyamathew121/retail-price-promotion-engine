@@ -127,6 +127,32 @@ def test_insufficient_history_is_reported_without_a_recommendation():
     assert result["recommendation"] == "Review - insufficient baseline"
 
 
+def test_baseline_uses_only_the_four_immediately_preceding_weeks():
+    weekly = _promotion_example("fixed_window", (20, 20), 9.0)
+    weekly.loc[:1, "units_sold"] = 100
+
+    result = _evaluate_series_promotions(weekly, gross_margin_rate=0.30)[0]
+
+    assert result["baseline_weeks_used"] == 4
+    assert result["baseline_units_per_week"] == 55
+    assert result["baseline_sales"] == 110
+
+
+def test_promotion_in_fixed_baseline_window_is_excluded():
+    weekly = _promotion_example("exclude_other_promo", (20, 20), 9.0)
+    weekly.loc[2, "promo_flag"] = 1
+
+    result = next(
+        row
+        for row in _evaluate_series_promotions(weekly, gross_margin_rate=0.30)
+        if row["promotion_start"] == weekly.loc[4, "week_start"].date().isoformat()
+    )
+
+    assert result["analysis_status"] == "insufficient_baseline"
+    assert result["baseline_weeks_used"] == 3
+    assert result["baseline_sales"] is None
+
+
 @pytest.mark.parametrize("margin_rate", [0.0, 1.0, -0.1, 1.1])
 def test_invalid_margin_rates_are_rejected(margin_rate):
     with pytest.raises(ValueError, match="gross_margin_rate"):

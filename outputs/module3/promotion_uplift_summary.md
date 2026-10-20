@@ -5,8 +5,9 @@
 The analysis reads `data/processed/clean_retail_data.parquet` and is produced
 by `src/retail_engine/module3.py`. It treats consecutive flagged Saturday-start
 weeks for an item-store as one inferred promotion episode. The baseline is the
-mean unit sales from the four latest non-promotion weeks within the preceding
-eight calendar weeks. Assumed regular-price gross margins are 25% for FOODS,
+mean unit sales from the four calendar weeks immediately before each episode,
+requiring all four weeks to be observed and non-promotional. Assumed
+regular-price gross margins are 25% for FOODS,
 35% for HOUSEHOLD, and 40% for HOBBIES; estimated unit cost is held fixed
 through the promotion. These are assumptions, not observed data. The table
 records category, average discount depth, and the margin rate used for each
@@ -19,17 +20,25 @@ The generated, row-level table and its audit are
 artifacts are ignored by Git; this script and report document how they were
 created.
 
+The optional CausalML diagnostic has also been generated at
+`data/processed/module3_causalml/promotion_tlearner_observational.csv`, with
+its audit in the same folder. It fits a T-learner on 1,000 selected promoted
+item-store series and reports 30 department/store summaries on a chronological
+holdout. Because the treatment is still the inferred M5 price-drop flag, these
+outputs are observational diagnostics, not causal uplift estimates or
+promotion recommendations.
+
 ## Run totals
 
 | Result | Count |
 |---|---:|
 | Inferred promotion episodes | 16,749 |
-| Fully evaluated (four baseline weeks available) | 16,253 |
-| Possible permanent price change — review | 6,980 (6,770 complete; 210 also lack baseline) |
-| Marked for review (insufficient baseline, not persistent) | 286 |
-| Continue promotion | 1,248 |
-| Reduce discount | 3,571 |
-| Stop promotion | 4,664 |
+| Fully evaluated (four baseline weeks available) | 15,669 |
+| Possible permanent price change — review | 6,980 (6,713 complete; 267 also lack baseline) |
+| Marked for review (insufficient baseline, not persistent) | 813 |
+| Continue promotion | 1,239 |
+| Reduce discount | 3,276 |
+| Stop promotion | 4,441 |
 
 The persistence check flags an episode when the following observed week's
 price is at most 105% of its final flagged-week price. This review warning
@@ -40,8 +49,8 @@ with `estimate-promotion-uplift`.
 
 Among complete episodes, median duration was five weeks; the 75th percentile
 was eight weeks. These are runs in the Module 1 price-drop proxy, not verified
-retailer campaigns. Of 16,253 complete episodes, 3,271 (20.1%) had a zero-unit
-baseline, and 6,806 (41.9%) had promotion sales at or below baseline sales.
+retailer campaigns. Of 15,669 complete episodes, 3,271 (20.9%) had a zero-unit
+baseline, and 6,556 (41.8%) had promotion sales at or below baseline sales.
 These sparse/weak-sales cases are frequent enough to affect segment medians;
 in particular, median ROI values of -1.000 should not be read as evidence of a
 generalizable campaign effect. Check sparse-history and inventory context
@@ -63,7 +72,7 @@ two promotion weeks, and two post-promotion weeks at 8 units/week.
 
 For example, Case A has promotion contribution `40 * ($9 - $7) = $80` and
 baseline contribution `20 * ($10 - $7) = $60`, so incremental margin is $20.
-The output's calculations were also checked across all 16,253 complete M5
+The output's calculations were also checked across all 15,669 complete M5
 episodes: incremental-unit differences were exact, and maximum absolute
 floating-point discrepancies for incremental revenue and margin were below
 `4.6e-12`.
@@ -92,31 +101,31 @@ the three earlier arithmetic cases retain an explicit 30% margin override.
 The requested segment calculation is saved verbatim in
 `outputs/module3/roi_by_segment.txt`. It reports median promotion ROI after
 excluding incomplete and possible-permanent-price-change rows. For the
-remaining 9,483 complete episodes, the medians are:
+remaining 8,956 complete episodes, the medians are:
 
 | Segment | Median ROI |
 |---|---:|
-| Depth (10%, 15%] | -0.189 |
-| Depth (15%, 25%] | -0.764 |
-| Depth (25%, 40%] | -1.000 |
+| Depth (10%, 15%] | -0.135 |
+| Depth (15%, 25%] | -0.754 |
+| Depth (25%, 40%] | -1.011 |
 | Depth (40%, 100%] | -1.000 |
-| FOODS | -0.948 |
-| HOBBIES | -1.077 |
-| HOUSEHOLD | -0.968 |
+| FOODS | -0.945 |
+| HOBBIES | -1.090 |
+| HOUSEHOLD | -1.000 |
 
-The store-level medians are CA_1 -0.695, CA_2 -0.514, CA_3 -1.548,
-CA_4 -0.567, TX_1 -1.000, TX_2 -0.953, TX_3 -1.000, WI_1 -0.885,
-WI_2 -0.798, and WI_3 -0.810. Every category, store, and discount-depth
+The store-level medians are CA_1 -0.689, CA_2 -0.508, CA_3 -1.545,
+CA_4 -0.560, TX_1 -1.000, TX_2 -0.983, TX_3 -1.000, WI_1 -0.886,
+WI_2 -0.798, and WI_3 -0.785. Every category, store, and discount-depth
 band has a negative median ROI; the deeper discount bands have more negative
 medians than the shallowest band. This is consistent with discount cost
 eroding incremental contribution, but it does not establish causal effects:
 promotions are inferred from price drops and costs/margins are assumptions.
-Interpret the -1.000 medians alongside the data-quality rates above: 20.1% of
-complete episodes have zero baseline units, and 41.9% have promotion sales no
+Interpret the -1.000 medians alongside the data-quality rates above: 20.9% of
+complete episodes have zero baseline units, and 41.8% have promotion sales no
 higher than baseline. The sparse and non-incremental observations are
 substantial and can make the segment summaries sensitive to low-volume rows.
-The filtered recommendation counts are 1,248 Continue, 3,571 Reduce discount,
-and 4,664 Stop.
+The filtered recommendation counts are 1,239 Continue, 3,276 Reduce discount,
+and 4,441 Stop.
 
 ## Three examples from the M5 output
 

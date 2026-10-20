@@ -126,10 +126,12 @@ account for this measurement limitation.
     item-store. This is a price-drop proxy, not a retailer-supplied promotion
     calendar.
 2. **Baseline:** for each window, take the mean units sold across the four
-    latest non-promotion weeks found within the preceding eight calendar weeks.
-    Multiply that weekly mean by the promotion duration to estimate baseline
-    sales. If four non-promotion weeks are not available, report the episode as
-    insufficient baseline and do not make a promotion recommendation.
+    calendar weeks immediately before it, excluding any weeks that are
+    themselves flagged as promotions. Multiply that weekly mean by the
+    promotion duration to estimate baseline sales. If any of those four weeks
+    is missing or flagged as a promotion, report the episode as insufficient
+    baseline and do not make a promotion recommendation. This is a simple
+    before-period comparison, not a causal counterfactual.
 3. **Gross margin:** assume category-specific regular-price gross margins of
     25% for FOODS, 35% for HOUSEHOLD, and 40% for HOBBIES. These are business
     assumptions, not observed M5 costs or data. `--gross-margin-rate` explicitly
@@ -164,6 +166,20 @@ account for this measurement limitation.
     are present; a negative value means post-promotion sales were below
     baseline. The post-promotion result is diagnostic and does not alter the
     promotion recommendation.
+9. **CausalML T-learner diagnostic:** the optional `estimate-promotion-tlearner`
+    command fits CausalML's `BaseTRegressor` using lagged sales, prior-period
+    SNAP/event indicators, annual seasonality, and store/category indicators.
+    It uses a chronological holdout and reports predicted treatment-effect
+    summaries by store and category. Treatment remains the inferred M5
+    price-drop flag; it is not randomized campaign assignment. Therefore these
+    results are observational model diagnostics, not causal uplift, and must
+    not drive promotion decisions. The optional dependency is installed with
+    `python -m pip install -e ".[uplift]"`.
+10. **Experiment validation:** causal promotion effects require a recorded
+    randomized treatment/control assignment, known campaign dates and depth,
+    actual prices, inventory/availability, and product/store costs. The
+    experiment data contract and minimum design checks are in
+    `outputs/validation/experiment_readiness.md`.
 
 ## Module 4 — markdown dataset audit
 
@@ -273,7 +289,9 @@ account for this measurement limitation.
    of 100,000 prior orders to cross-check three high-ranked pair supports
    against direct counts. Limit its basket columns to the six products in
    those three pairs to keep memory bounded; retain all sampled orders in the
-   support denominator.
+   support denominator. Full-prior candidate discovery currently uses
+   DuckDB pair counts; the sample FP-Growth run is a cross-check, not full-data
+   FP-Growth mining.
 6. **M5 department mapping (assumption):** map `household` to `HOUSEHOLD`;
    map `bakery`, `beverages`, `breakfast`, `bulk`, `canned goods`, `dairy
    eggs`, `deli`, `dry goods pasta`, `frozen`, `international`, `meat

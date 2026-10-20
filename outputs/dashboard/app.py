@@ -402,7 +402,29 @@ def module3_page() -> None:
         use_container_width=True,
         hide_index=True,
     )
-    source_note([path, "data/processed/module3/promotion_uplift_audit.json", "outputs/module3/promotion_uplift_summary.md"])
+    tlearner_path = "data/processed/module3_causalml/promotion_tlearner_observational.csv"
+    tlearner = load_csv(tlearner_path)
+    if tlearner is not None:
+        st.markdown("#### Observational CausalML diagnostic")
+        st.caption(
+            "T-learner summaries use inferred price-drop exposure; they are "
+            "diagnostics, not causal uplift estimates or promotion recommendations."
+        )
+        st.dataframe(
+            tlearner.sort_values(
+                "mean_predicted_treatment_effect_units",
+                ascending=False,
+            ).head(30),
+            use_container_width=True,
+            hide_index=True,
+        )
+    source_note([
+        path,
+        "data/processed/module3/promotion_uplift_audit.json",
+        tlearner_path,
+        "data/processed/module3_causalml/promotion_tlearner_observational_audit.json",
+        "outputs/module3/promotion_uplift_summary.md",
+    ])
     limitation("Module 3")
 
 

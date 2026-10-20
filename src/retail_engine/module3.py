@@ -13,7 +13,7 @@ from retail_engine.module2 import WEEK_START_SQL
 
 CATEGORY_MARGIN_RATES = {"FOODS": 0.25, "HOUSEHOLD": 0.35, "HOBBIES": 0.40}
 BASELINE_WEEKS = 4
-BASELINE_LOOKBACK_WEEKS = 8
+BASELINE_LOOKBACK_WEEKS = 4
 POST_PROMO_WEEKS = 2
 OUTPUT_COLUMNS = [
     "item_id",
@@ -302,9 +302,9 @@ def _audit_summary(
             "insufficient, the persistence review takes precedence."
         ),
         "baseline_method": (
-            f"Mean weekly units from the {BASELINE_WEEKS} latest non-promotion "
-            f"weeks in the {BASELINE_LOOKBACK_WEEKS} calendar weeks before the "
-            "promotion; require all baseline weeks or mark insufficient."
+            f"Mean weekly units from the {BASELINE_WEEKS} calendar weeks "
+            "immediately before the promotion, excluding any promotion weeks; "
+            "require all baseline weeks or mark insufficient."
         ),
         "category_margin_rate_assumptions": CATEGORY_MARGIN_RATES,
         "gross_margin_rate_override": gross_margin_rate,

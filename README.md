@@ -15,6 +15,9 @@ automatic commercial actions.
   retail outcomes.
 - M5 elasticity estimates are observational and can be affected by unmeasured
   confounding; pooled defaults are department-level, not SKU-specific.
+- The optional CausalML promotion T-learner uses M5's inferred, non-random
+  price-drop treatment and is a chronological-holdout model diagnostic—not
+  causal uplift or a recommendation.
 - Instacart contains no prices. Bundle candidates are associations and need
   cross-price validation before pricing or promotion decisions.
 
@@ -229,8 +232,10 @@ estimate-promotion-uplift
 ```
 
 The command groups consecutive inferred promotion weeks for each item-store,
-compares sales with the mean of the four latest non-promotion weeks in the
-preceding eight calendar weeks, and estimates incremental revenue and margin.
+compares sales with the mean of non-promotion weeks in the four calendar weeks
+immediately before each episode, and estimates incremental revenue and margin.
+All four weeks must be observed and non-promotional; otherwise the episode is
+retained as insufficient-baseline rather than receiving a recommendation.
 It uses assumed regular-price gross margins of 25% for FOODS, 35% for
 HOUSEHOLD, and 40% for HOBBIES. These are assumptions, not data; pass
 `--gross-margin-rate` only when intentionally overriding the category margins.
@@ -241,6 +246,25 @@ review, rather than silently omitted. The CSV and audit JSON are written to
 financial assumptions are documented in
 `assumptions.md`; first-run totals and hand calculations are in
 `outputs/module3/promotion_uplift_summary.md`.
+
+#### Optional CausalML T-learner diagnostic
+
+Install the optional dependency and run the separate exploratory model:
+
+```powershell
+py -m pip install -e ".[uplift]"
+estimate-promotion-tlearner --max-series 1000
+```
+
+This fits CausalML's T-learner on selected item-store weekly series, using
+lagged sales and pre-period calendar/store/category features, and reports
+predicted effects by store and department on a chronological holdout. The
+treatment is still the inferred price-drop flag, not randomized campaign
+assignment. The output is explicitly labelled observational and is **not**
+causal uplift; it must not be used for promotion decisions. A credible causal
+estimate requires real assigned treatment/control records. The experiment
+contract and validation checklist are in
+[`outputs/validation/experiment_readiness.md`](outputs/validation/experiment_readiness.md).
 
 ### Module 4: markdown dataset audit
 
@@ -299,7 +323,9 @@ to run the recommendation CSV under either alternate period assumption.
    intervals and cautious actions (M5 implementation, pooled diagnostics, and
    C1/DoubleML validation complete; interpretation and limits are documented).
 3. **Promotion uplift:** estimated incremental units and profit against a
-   documented baseline, with a two-week post-promotion dip check (implemented).
+   four-week immediate pre-period baseline and two-week post-promotion dip
+   check (implemented as observational comparison); optional CausalML
+   T-learner diagnostic is not causally identified.
 4. **Markdown optimization:** D2 source audited; a labelled-assumption
    product-level scenario simulator is implemented. Validated time-based,
    inventory, and profit optimization still require better field definitions
