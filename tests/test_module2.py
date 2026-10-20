@@ -7,6 +7,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from retail_engine.module2 import (
+    _calendar_week_numbers,
     _crossfit_dml,
     _hac_standard_error,
     _weekly_control_matrix,
@@ -137,3 +138,17 @@ def test_hac_matches_only_observations_at_exact_week_lags():
     assert _hac_standard_error(influence, week_indices, max_lag=4) == pytest.approx(
         expected
     )
+
+
+def test_calendar_week_numbers_keep_gaps_between_observed_weeks():
+    weeks = pd.Series(
+        pd.to_datetime(["2015-01-03", "2015-01-10", "2015-01-24", "2015-02-07"])
+    )
+
+    np.testing.assert_array_equal(_calendar_week_numbers(weeks), [0, 1, 3, 5])
+
+
+def test_calendar_week_numbers_match_positions_without_gaps():
+    weeks = pd.Series(pd.date_range("2015-01-03", periods=6, freq="7D"))
+
+    np.testing.assert_array_equal(_calendar_week_numbers(weeks), np.arange(6))

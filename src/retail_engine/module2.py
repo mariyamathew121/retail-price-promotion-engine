@@ -90,6 +90,14 @@ def _weekly_control_matrix(weekly: pd.DataFrame) -> np.ndarray:
     )
 
 
+def _calendar_week_numbers(week_start: pd.Series) -> np.ndarray:
+    """Whole weeks since the first observed week, so gaps keep their distance."""
+    days = (pd.to_datetime(week_start) - pd.to_datetime(week_start).min()).dt.days
+    if (days % 7).any():
+        raise ValueError("week_start values must be 7-day multiples apart")
+    return (days // 7).to_numpy(dtype=np.int64)
+
+
 def _hac_standard_error(
     influence: np.ndarray,
     week_indices: np.ndarray,
@@ -254,10 +262,7 @@ def _estimate_combination(
     controls = _weekly_control_matrix(modeling_data)
     log_price = np.log(modeling_data["price"].to_numpy(dtype=np.float64))
     log_units = np.log1p(modeling_data["units_sold"].to_numpy(dtype=np.float64))
-    all_week_index = pd.Index(weekly["week_start"])
-    week_indices = all_week_index.get_indexer(pd.Index(modeling_data["week_start"]))
-    if np.any(week_indices < 0):
-        raise ValueError("Could not map positive sales weeks back to the time series")
+    week_indices = _calendar_week_numbers(modeling_data["week_start"])
 
     try:
         dml_estimate, dml_se = _crossfit_dml(
