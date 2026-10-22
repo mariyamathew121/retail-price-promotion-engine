@@ -202,27 +202,48 @@ def _sales_chunks(
 def _spot_check_rows(
     prices: pd.DataFrame, limit: int = 10
 ) -> pd.DataFrame:
+    """Pick `limit` SKU-store histories that cover varied departments and stores.
+
+    Candidates with at least one flagged promotion week are preferred. They are
+    chosen greedily: fewest already-selected SKU-stores in the same department
+    first, then fewest in the same store, then the most promotion weeks, then
+    item and store ids, so the sample is deterministic. SKU-stores with no
+    flagged week are used only if there are too few flagged ones.
+    """
     promo_counts = (
         prices.groupby(list(PRICE_KEYS[:2]), as_index=False, observed=True)[
             "promo_flag"
         ]
         .sum()
-        .sort_values(
-            ["promo_flag", *PRICE_KEYS[:2]],
-            ascending=[False, True, True],
-            kind="stable",
-        )
+        .sort_values(list(PRICE_KEYS[:2]), kind="stable")
+        .reset_index(drop=True)
     )
-    preferred = promo_counts.loc[promo_counts["promo_flag"] > 0]
-    selected = pd.concat(
-        [
-            preferred,
-            promo_counts.loc[promo_counts["promo_flag"] == 0].sort_values(
-                list(PRICE_KEYS[:2]), kind="stable"
-            ),
-        ],
-        ignore_index=True,
-    ).drop_duplicates(list(PRICE_KEYS[:2])).head(limit)
+    promo_counts["dept_id"] = promo_counts["item_id"].astype(str).str.rsplit(
+        "_", n=1
+    ).str[0]
+    flagged = promo_counts.loc[promo_counts["promo_flag"] > 0]
+    unflagged = promo_counts.loc[promo_counts["promo_flag"] == 0]
+
+    chosen: list[int] = []
+    department_use: dict[str, int] = {}
+    store_use: dict[str, int] = {}
+    for pool in (flagged, unflagged):
+        remaining = pool.copy()
+        while len(chosen) < limit and not remaining.empty:
+            ranked = remaining.assign(
+                dept_use=remaining["dept_id"].map(department_use).fillna(0),
+                store_use=remaining["store_id"].map(store_use).fillna(0),
+            ).sort_values(
+                ["dept_use", "store_use", "promo_flag", "item_id", "store_id"],
+                ascending=[True, True, False, True, True],
+                kind="stable",
+            )
+            pick = ranked.iloc[0]
+            chosen.append(int(pick.name))
+            department_use[pick["dept_id"]] = department_use.get(pick["dept_id"], 0) + 1
+            store_use[pick["store_id"]] = store_use.get(pick["store_id"], 0) + 1
+            remaining = remaining.drop(index=pick.name)
+    selected = promo_counts.loc[chosen]
     checked = prices.merge(
         selected[list(PRICE_KEYS[:2])],
         on=list(PRICE_KEYS[:2]),
@@ -350,6 +371,24 @@ def _make_batch(
     for column in ("store_id", "state_id", "item_id", "dept_id", "cat_id"):
         sales[column] = sales[column].astype("string")
     return sales, missing_price_rows
+
+
+def refresh_spot_checks(
+    prices_path: Path, calendar_path: Path, output_path: Path
+) -> int:
+    """Rewrite only the spot-check CSV and plot from the weekly price table."""
+    calendar = _prepare_calendar(calendar_path)
+    prices = _prepare_prices(prices_path, calendar)
+    output_path = Path(output_path)
+    spot_checks = _spot_check_rows(prices)
+    spot_checks.to_csv(
+        output_path.with_name(f"{output_path.stem}_promo_spot_checks.csv"), index=False
+    )
+    _plot_spot_checks(
+        spot_checks,
+        output_path.with_name(f"{output_path.stem}_promo_spot_checks.png"),
+    )
+    return int(spot_checks[["item_id", "store_id"]].drop_duplicates().shape[0])
 
 
 def build_clean_retail_data(
@@ -512,7 +551,18 @@ def main() -> None:
         default=128,
         help="SKU-store rows to reshape at a time (lower this to reduce memory use).",
     )
+    parser.add_argument(
+        "--spot-checks-only",
+        action="store_true",
+        help="Rewrite only the promo spot-check CSV and plot; skip the full build.",
+    )
     arguments = parser.parse_args()
+    if arguments.spot_checks_only:
+        count = refresh_spot_checks(
+            arguments.prices, arguments.calendar, arguments.output
+        )
+        print(f"Spot-check SKU-store combinations written: {count}")
+        return
     result = build_clean_retail_data(
         arguments.sales,
         arguments.prices,

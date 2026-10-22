@@ -6,6 +6,7 @@ import pytest
 from retail_engine.module1 import (
     OUTPUT_COLUMNS,
     _add_rolling_regular_prices,
+    _spot_check_rows,
     build_clean_retail_data,
 )
 
@@ -128,6 +129,37 @@ def test_builds_expected_output_and_audit(m5_inputs, tmp_path):
     audit_file = output.with_name("clean_retail_data_audit.json")
     saved_audit = json.loads(audit_file.read_text(encoding="utf-8"))
     assert saved_audit["promo_flag_rows"] == 1
+
+
+def test_spot_checks_prefer_varied_departments_and_stores():
+    weeks = pd.date_range("2020-01-04", periods=2, freq="7D")
+    rows = []
+    for item_id, store_id, promo_weeks in [
+        ("FOODS_1_001", "CA_3", 2),
+        ("FOODS_1_002", "CA_3", 2),
+        ("FOODS_1_003", "CA_3", 2),
+        ("HOBBIES_1_001", "TX_1", 1),
+        ("HOUSEHOLD_1_001", "WI_2", 1),
+    ]:
+        for index, week in enumerate(weeks):
+            rows.append(
+                {
+                    "item_id": item_id,
+                    "store_id": store_id,
+                    "wm_yr_wk": index,
+                    "week_start": week,
+                    "sell_price": 1.0,
+                    "regular_price": 1.2,
+                    "has_price_history": True,
+                    "promo_flag": int(index < promo_weeks),
+                    "discount_depth": 0.2,
+                }
+            )
+    result = _spot_check_rows(pd.DataFrame(rows), limit=3)
+    combinations = result[["item_id", "store_id"]].drop_duplicates()
+
+    assert combinations["item_id"].str.rsplit("_", n=1).str[0].nunique() == 3
+    assert combinations["store_id"].nunique() == 3
 
 
 def test_rolling_max_excludes_current_and_uses_prior_eight_calendar_weeks():
