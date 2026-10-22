@@ -193,7 +193,8 @@ selected series and an audit JSON are written to
 size. Eligibility rules and limitations are recorded in
 [assumptions.md](assumptions.md).
 
-Module 2 interpretation, including the consolidated
+The half-page naive-versus-DML comparison that the brief asks for is section 1
+of the Module 2 interpretation below. Module 2 interpretation, including the consolidated
 [`module2_interpretation.md`](outputs/module2/module2_interpretation.md),
 category medians, same-item stability diagnostics, and positive-elasticity
 diagnostic plots, are in

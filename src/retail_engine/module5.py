@@ -353,9 +353,15 @@ def mine_fpgrowth_rules(
         shape=(sample_size, len(product_ids)),
         dtype=np.bool_,
     ).tocsr()
-    baskets = pd.DataFrame.sparse.from_spmatrix(
-        basket_matrix, columns=[str(int(product_id)) for product_id in product_ids]
-    ).astype(pd.SparseDtype(np.bool_, fill_value=False))
+    basket_csc = basket_matrix.tocsc()
+    baskets = pd.DataFrame(
+        {
+            str(int(product_id)): pd.arrays.SparseArray(
+                basket_csc[:, column].toarray().ravel(), fill_value=False
+            )
+            for column, product_id in enumerate(product_ids)
+        }
+    )
     itemsets = fpgrowth(baskets, min_support=min_support, use_colnames=True, max_len=2)
     if itemsets.empty:
         return pd.DataFrame(columns=RULE_COLUMNS)
