@@ -131,6 +131,7 @@ def _ols_log_log(
     log_units: np.ndarray,
     controls: np.ndarray,
     week_indices: np.ndarray,
+    max_lag: int = 4,
 ) -> tuple[float, float]:
     nuisance = np.column_stack(
         [np.ones(len(log_price), dtype=np.float64), controls]
@@ -147,7 +148,7 @@ def _ols_log_log(
         nuisance, log_units - estimate * log_price, rcond=None
     )[0] - estimate * log_price
     price_influence = price_residual * residuals / residual_variance
-    se = _hac_standard_error(price_influence, week_indices)
+    se = _hac_standard_error(price_influence, week_indices, max_lag)
     return estimate, se
 
 
@@ -160,6 +161,7 @@ def _crossfit_dml(
     folds: int,
     trees: int,
     seed: int,
+    max_lag: int = 4,
 ) -> tuple[float, float]:
     sample_size = len(log_price)
     if sample_size < folds * 5:
@@ -204,7 +206,7 @@ def _crossfit_dml(
         price_residual * (units_residual - estimate * price_residual)
         / residual_variance
     )
-    standard_error = _hac_standard_error(influence, week_indices)
+    standard_error = _hac_standard_error(influence, week_indices, max_lag)
     return estimate, standard_error
 
 

@@ -38,6 +38,31 @@ Individual review notes for positive point estimates are stored in the
 report plots the five largest examples for visual inspection, but the row-level
 explanations cover the broader positive-estimate set.
 
+## Daily-grain check with the brief's control list
+
+The brief lists weekday, month, store and category as controls, but the primary
+models are weekly (M5 prices change weekly), where weekday does not exist and
+store and category are constant within a series. To honour the list as far as it
+can apply, the same 100 series were re-estimated on daily rows with weekday and
+month indicators plus SNAP, event and the promotion flag
+(`module2-daily-check`; details in [`daily_grain_check.md`](./daily_grain_check.md)).
+
+The two grains agree on the conclusions: correlation **0.91**, same sign for
+**94%** of series, same demand type for **92%**, and **99%** of the weekly and
+daily 95% intervals overlap. The daily run classifies 27 price-sensitive, 10 less
+sensitive and 63 unclear, and still has 48 positive point estimates (27
+significantly positive), so the positive-elasticity concern is not an artefact of
+weekly aggregation.
+
+The medians differ more than the rankings do: **-0.116 daily versus -0.484
+weekly** (median absolute gap 0.765). Log-of-one-plus attenuation does not
+explain this: these are high-volume series (17 to 46 units a day on average, 11.5%
+zero-sales days) and the gap barely tracks volume (Spearman -0.17). With
+per-series intervals 4 to 6 units wide, a shift of this size is within the noise,
+so neither median should be read as the true typical elasticity. Daily rows repeat
+each weekly price seven times and add no new price variation, so the daily
+intervals are not evidence of greater precision.
+
 ## Pooled 10k results
 
 The pooled fixed-effects PPML model is the default comparison because it
@@ -90,6 +115,24 @@ intervals excluding zero: linear **-1.756**, LassoCV **-1.767**, random forest
 series, `FOODS_1_096` at `WI_2`, the custom consecutive-fold estimate was
 **-9.610** versus **-8.594** from `DoubleMLPLR`. This is an implementation
 cross-check, not evidence that the M5 estimates are causally identified.
+
+**Comparison with the C1 notebook.** The notebook
+(`py_elasticity_analysis_tools.ipynb`) is a tutorial exercise: most cells are
+`TODO` and it stores no outputs. Its only stated result is that the elasticity is
+"around -1.8" and significantly different from zero in all models, which all four
+learners above reproduce (-1.756 to -1.829, intervals excluding zero). It uses
+partialling-out PLR, five folds and seed 123, the same settings used here.
+
+**Sensitivity analysis (notebook section 8).** Using XGBoost nuisance learners
+(the notebook's boosting example), the elasticity is **-1.798** (95% CI
+[-1.882, -1.713]). Allowing unobserved confounders that explain 3% of the residual
+variance of both outcome and price (the DoubleML default) keeps the estimate
+between **-1.917 and -1.678**, and the interval within [-1.988, -1.607]. The
+robustness value is **36.5%** (35.2% adjusted): a hidden confounder would need to
+explain over a third of the residual variance of both price and demand to reduce
+the estimate to zero. Benchmarking against the three most important predictors of
+the outcome and of the treatment moves the estimate by at most **0.024**. This
+describes the tutorial data only; it says nothing about the M5 estimates.
 
 ## Bottom line
 

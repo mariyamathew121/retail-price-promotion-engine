@@ -52,7 +52,12 @@ account for this measurement limitation.
    per-series model is weekly, so weekday does not apply; month is captured by
    annual sine/cosine seasonality; store and category are constant within a
    single item-store series. The pooled model absorbs store and item effects
-   through fixed effects.
+   through fixed effects. Because this departs from the brief's control list, a
+   daily-grain check (`module2-daily-check`) re-estimates the same 100 series with
+   weekday and month indicators plus SNAP, event and promotion flags, using a
+   28-day Newey-West lag; weekly stays the primary result because prices change
+   weekly and daily rows add no price variation. Store and category remain
+   uncontrollable inside a single series and are absorbed by it.
 2. **Eligibility:** select up to 100 item-store combinations by total units
    sold, requiring at least 104 observed weeks, 52 positive-sales weeks, three
    distinct prices, and a maximum/minimum price range of at least 5%. These
@@ -89,8 +94,11 @@ account for this measurement limitation.
 8. **Reference validation and limits:** the C1 partialling-out DoubleML
    exercise was run on its separate 10,000-row Online Retail example with
    linear, LassoCV, random-forest, and histogram-gradient-boosting nuisance
-   learners. A selected M5 series was also cross-checked against
-   `DoubleMLPLR`. These are implementation checks, not proof of causal
+   learners, followed by the notebook's sensitivity analysis (XGBoost learners,
+   default confounding strength, robustness value and benchmarking against the
+   most important predictors). A selected M5 series was also cross-checked against
+   `DoubleMLPLR`. The notebook stores no outputs and states only that the
+   elasticity is about -1.8, which the replication reproduces. These are implementation checks, not proof of causal
    identification or validation of the M5 estimates. The C1 dataset is
    different from M5; the M5 check covers one series, uses random folds and
    DoubleML's default IID inference versus consecutive folds and HAC

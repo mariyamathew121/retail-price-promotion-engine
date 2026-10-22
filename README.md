@@ -204,6 +204,19 @@ diagnostic notes with:
 py -3.10 outputs/module2/generate_positive_elasticity_cases.py
 ```
 
+### Daily-grain check (brief's control list)
+
+The per-SKU models are weekly, so weekday cannot be a control. To check the
+results against the brief's list (weekday, month, SNAP, event, promotion), run:
+
+```powershell
+module2-daily-check
+```
+
+It re-estimates the same series on daily rows and writes
+`data/processed/module2/daily_grain_check.csv` and
+`outputs/module2/daily_grain_check.md` with the comparison to the weekly results.
+
 ### Same-item stability across stores
 
 After `estimate-price-elasticity`, compare each item's per-SKU estimates across
@@ -236,8 +249,11 @@ validate-module2
 
 This runs the C1 PLR example with linear, LassoCV, random-forest, and
 histogram-gradient-boosting nuisance learners, evaluates their nuisance
-prediction performance, and cross-checks a selected M5 series against
-`DoubleMLPLR`. The input data and generated validation outputs remain under
+prediction performance, runs the notebook's sensitivity analysis (XGBoost
+learners, robustness value and benchmarking), and cross-checks a selected M5
+series against `DoubleMLPLR`. The random-forest learner is slow (a single
+random-forest fit took over ten minutes in testing); the XGBoost sensitivity
+step took about 80 seconds. The input data and generated validation outputs remain under
 ignored `data/` paths: `data/processed/module2_validation/` contains the
 learner results CSV, audit JSON, and M5 cross-check JSON. The recorded results
 and interpretation are summarized in

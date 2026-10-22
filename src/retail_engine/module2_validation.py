@@ -76,14 +76,9 @@ def _new_c1_learners(seed: int) -> dict[str, tuple[object, object]]:
     }
 
 
-def run_c1_replication(
-    data_path: Path,
-    output_dir: Path,
-    *,
-    seed: int = 123,
-    n_folds: int = 5,
-) -> pd.DataFrame:
-    DoubleMLData, DoubleMLPLR = _doubleml_classes()
+def _c1_data_backend(data_path: Path):
+    """Load the C1 tutorial subset into a DoubleMLData object."""
+    DoubleMLData, _ = _doubleml_classes()
     if not data_path.is_file():
         raise FileNotFoundError(
             f"Tutorial subset not found at {data_path}. Download {C1_DATA_URL} "
@@ -114,6 +109,18 @@ def run_c1_replication(
         d_cols="dLnP",
         x_cols=feature_names,
     )
+    return data_dml, feature_names, int(data.shape[0])
+
+
+def run_c1_replication(
+    data_path: Path,
+    output_dir: Path,
+    *,
+    seed: int = 123,
+    n_folds: int = 5,
+) -> pd.DataFrame:
+    _, DoubleMLPLR = _doubleml_classes()
+    data_dml, feature_names, n_rows = _c1_data_backend(data_path)
 
     rows: list[dict[str, object]] = []
     for learner_name, (ml_l, ml_m) in _new_c1_learners(seed).items():
@@ -138,7 +145,7 @@ def run_c1_replication(
                 "p_value": float(summary["P>|t|"]),
                 "ml_l_rmse": float(np.mean(learner_errors["ml_l"])),
                 "ml_m_rmse": float(np.mean(learner_errors["ml_m"])),
-                "observations": int(data.shape[0]),
+                "observations": n_rows,
                 "features": int(len(feature_names)),
             }
         )
@@ -149,7 +156,7 @@ def run_c1_replication(
     audit = {
         "source_url": C1_DATA_URL,
         "input_file": str(data_path),
-        "rows": int(data.shape[0]),
+        "rows": n_rows,
         "features": int(len(feature_names)),
         "outcome": "dLnQ",
         "treatment": "dLnP",
@@ -164,6 +171,116 @@ def run_c1_replication(
         encoding="utf-8",
     )
     return results
+
+
+def run_c1_sensitivity(
+    data_path: Path,
+    output_dir: Path,
+    *,
+    seed: int = 123,
+    n_folds: int = 5,
+    n_estimators: int = 100,
+    cf_y: float = 0.03,
+    cf_d: float = 0.03,
+    rho: float = 1.0,
+    top_features: int = 3,
+) -> dict[str, object]:
+    """Section 8 of the C1 notebook: sensitivity analysis with benchmarking.
+
+    Fits the partialling-out PLR with XGBoost nuisance learners (the notebook's
+    boosting example), runs `sensitivity_analysis`, then benchmarks the unobserved
+    confounding strength against each of the `top_features` most important
+    predictors of the outcome and of the treatment.
+    """
+    try:
+        from xgboost import XGBRegressor
+    except ImportError as error:
+        raise ImportError(
+            "The sensitivity analysis needs XGBoost; install the validation extra "
+            'with `python -m pip install -e ".[validation]"`.'
+        ) from error
+    _, DoubleMLPLR = _doubleml_classes()
+    data_dml, feature_names, n_rows = _c1_data_backend(data_path)
+
+    def new_learner() -> XGBRegressor:
+        return XGBRegressor(
+            n_estimators=n_estimators,
+            learning_rate=0.1,
+            max_depth=4,
+            subsample=0.8,
+            n_jobs=1,
+            random_state=seed,
+        )
+
+    np.random.seed(seed)
+    model = DoubleMLPLR(
+        data_dml,
+        ml_l=new_learner(),
+        ml_m=new_learner(),
+        n_folds=n_folds,
+        score="partialling out",
+    )
+    model.fit(store_models=True)
+    summary = model.summary.loc["dLnP"]
+    model.sensitivity_analysis(cf_y=cf_y, cf_d=cf_d, rho=rho, level=0.95)
+    params = model.sensitivity_params
+
+    def top_by_importance(role: str) -> list[str]:
+        learner = model.models[role]["dLnP"][0][0]
+        importance = pd.Series(learner.feature_importances_, index=feature_names)
+        return importance.sort_values(ascending=False).head(top_features).index.tolist()
+
+    outcome_features = top_by_importance("ml_l")
+    treatment_features = top_by_importance("ml_m")
+    benchmark_rows = []
+    for role, features in (("outcome", outcome_features), ("treatment", treatment_features)):
+        for feature in features:
+            benchmark = model.sensitivity_benchmark(benchmarking_set=[feature])
+            row = benchmark.iloc[0]
+            benchmark_rows.append(
+                {
+                    "benchmark_feature": feature,
+                    "top_predictor_of": role,
+                    "cf_y": float(row["cf_y"]),
+                    "cf_d": float(row["cf_d"]),
+                    "rho": float(row["rho"]),
+                    "delta_theta": float(row["delta_theta"]),
+                }
+            )
+    benchmarks = pd.DataFrame(benchmark_rows)
+
+    audit = {
+        "source_url": C1_DATA_URL,
+        "notebook_section": "8. Sensitivity Analysis",
+        "learner": "XGBRegressor (notebook's boosting example), 100 trees, depth 4",
+        "n_folds": n_folds,
+        "seed": seed,
+        "rows": n_rows,
+        "elasticity": float(summary["coef"]),
+        "ci_lower": float(summary["2.5 %"]),
+        "ci_upper": float(summary["97.5 %"]),
+        "assumed_confounding": {"cf_y": cf_y, "cf_d": cf_d, "rho": rho},
+        "theta_bounds": [
+            float(params["theta"]["lower"][0]),
+            float(params["theta"]["upper"][0]),
+        ],
+        "ci_bounds": [float(params["ci"]["lower"][0]), float(params["ci"]["upper"][0])],
+        "robustness_value": float(params["rv"][0]),
+        "robustness_value_adjusted": float(params["rva"][0]),
+        "max_benchmark_abs_delta_theta": float(benchmarks["delta_theta"].abs().max()),
+        "interpretation": (
+            "The robustness value is the share of residual variance that an unobserved "
+            "confounder would have to explain in both outcome and treatment to bring "
+            "the estimate to zero. This is sensitivity to hidden confounding in the "
+            "tutorial data, not proof of causality."
+        ),
+    }
+    output_dir.mkdir(parents=True, exist_ok=True)
+    benchmarks.to_csv(output_dir / "c1_doubleml_sensitivity_benchmarks.csv", index=False)
+    (output_dir / "c1_doubleml_sensitivity_audit.json").write_text(
+        json.dumps(audit, indent=2) + "\n", encoding="utf-8"
+    )
+    return audit
 
 
 def run_m5_doubleml_crosscheck(
@@ -296,6 +413,7 @@ def main() -> None:
     args = parser.parse_args()
 
     c1_results = run_c1_replication(args.c1_data, args.output_dir)
+    sensitivity = run_c1_sensitivity(args.c1_data, args.output_dir)
     crosscheck = run_m5_doubleml_crosscheck(
         args.m5_input,
         args.module2_results,
@@ -303,6 +421,8 @@ def main() -> None:
     )
     print("C1 DoubleML tutorial replication:")
     print(c1_results.to_string(index=False))
+    print("\nC1 sensitivity analysis (notebook section 8):")
+    print(json.dumps(sensitivity, indent=2))
     print("\nM5 custom-vs-DoubleMLPLR cross-check:")
     print(json.dumps(crosscheck, indent=2))
 

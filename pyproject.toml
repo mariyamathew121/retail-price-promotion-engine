@@ -23,6 +23,7 @@ dev = [
 ]
 validation = [
     "doubleml>=0.10.1",
+    "xgboost>=2.0",
 ]
 uplift = [
     "causalml>=0.15",
@@ -39,6 +40,7 @@ estimate-pooled-elasticity = "retail_engine.module2_pooled:main"
 validate-module2 = "retail_engine.module2_validation:main"
 module2-same-item-stability = "retail_engine.module2_stability:main"
 module2-control-ladder = "retail_engine.module2_ladder:main"
+module2-daily-check = "retail_engine.module2_daily:main"
 estimate-promotion-uplift = "retail_engine.module3:main"
 estimate-promotion-tlearner = "retail_engine.module3_causalml:main"
 optimize-markdowns = "retail_engine.module4:main"
