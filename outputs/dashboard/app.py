@@ -327,7 +327,7 @@ def module2_page() -> None:
         hide_index=True,
     )
     st.markdown("#### Interpretation")
-    interpretation_path = "outputs/module2/naive_dml_pooled_comparison.md"
+    interpretation_path = "outputs/module2/module2_interpretation.md"
     interpretation = _file(interpretation_path)
     if interpretation.is_file():
         st.markdown(interpretation.read_text(encoding="utf-8"))

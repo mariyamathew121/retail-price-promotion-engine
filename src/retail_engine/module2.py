@@ -369,7 +369,7 @@ def _comparison_report(
         f"least {min_price_range:.0%}. Up to {len(selection)} highest-volume "
         "eligible item-store combinations were selected.",
         "",
-        "## DML vs. naive OLS",
+        "## DML vs. naive and controlled OLS",
         "",
     ]
     if estimated.empty:
@@ -381,26 +381,38 @@ def _comparison_report(
         ]
     else:
         difference = estimated["elasticity"] - estimated["ols_elasticity"]
+        naive_difference = estimated["elasticity"] - estimated["naive_elasticity"]
         correlation = estimated[["elasticity", "ols_elasticity"]].corr().iloc[0, 1]
+        naive_correlation = estimated[["elasticity", "naive_elasticity"]].corr().iloc[0, 1]
         corr_text = f"{correlation:.2f}" if np.isfinite(correlation) else "not available"
+        naive_corr_text = (
+            f"{naive_correlation:.2f}" if np.isfinite(naive_correlation) else "not available"
+        )
         lines += [
             f"Models were estimable for {len(estimated)} of {len(selection)} "
             f"selected combinations. Median DML elasticity was "
-            f"{estimated['elasticity'].median():.3f}; median uncontrolled "
-            f"OLS elasticity was {estimated['naive_elasticity'].median():.3f}; "
+            f"{estimated['elasticity'].median():.3f}; median naive (uncontrolled) "
+            f"log-log OLS elasticity was {estimated['naive_elasticity'].median():.3f}; "
             f"median controlled OLS elasticity was "
-            f"{estimated['ols_elasticity'].median():.3f}. "
-            f"The median absolute estimate difference was "
-            f"{difference.abs().median():.3f}, and their correlation was "
-            f"{corr_text}. DML adjusts flexibly for the listed observed "
-            "calendar and promotion controls, while controlled OLS "
-            "imposes a linear relationship and uncontrolled OLS omits those "
-            "controls; differences show sensitivity to model specification, not "
-            "proof "
-            "that DML has removed all bias. The flexible DML nuisance models "
-            "can capture nonlinear calendar relationships that the linear OLS "
-            "controls cannot, but estimates may still be unstable when price "
-            "changes are sparse or predictable from time.",
+            f"{estimated['ols_elasticity'].median():.3f}.",
+            "",
+            f"**DML vs. naive:** the median absolute difference was "
+            f"{naive_difference.abs().median():.3f} and the correlation was "
+            f"{naive_corr_text}. The naive model uses no controls, so it mixes "
+            "price response with seasonality, SNAP days, events and promotion "
+            "timing.",
+            "",
+            f"**DML vs. controlled OLS:** the median absolute difference was "
+            f"{difference.abs().median():.3f} and the correlation was "
+            f"{corr_text}. Both adjust for the same observed controls; DML "
+            "fits flexible nuisance models for price and demand, while "
+            "controlled OLS imposes linear control effects. The inferred "
+            "promotion flag is derived from price, so controlling for it also "
+            "removes deep-discount price variation from the treatment.",
+            "",
+            "These differences show sensitivity to model specification, not "
+            "proof that DML has removed all bias; estimates may still be "
+            "unstable when price changes are sparse or predictable from time.",
             "",
             "The median 95% DML confidence-interval width was "
             f"{(estimated['ci_upper'] - estimated['ci_lower']).median():.3f}.",

@@ -291,8 +291,8 @@
               <tbody>
                 <tr><td>FOODS_1</td><td class="num">-1.301</td><td class="num">[-1.597, -1.006]</td><td><span class="badge pink">Price-sensitive*</span></td></tr>
                 <tr><td>FOODS_2</td><td class="num">-1.058</td><td class="num">[-1.312, -0.804]</td><td><span class="badge orange">Less sensitive</span></td></tr>
-                <tr><td>FOODS_3</td><td class="num">-0.882</td><td class="num">[-1.048, -0.716]</td><td><span class="badge orange">Less sensitive</span></td></tr>
-                <tr><td>HOBBIES_1</td><td class="num">-0.677</td><td class="num">[-0.990, -0.365]</td><td><span class="badge orange">Less sensitive</span></td></tr>
+                <tr><td>FOODS_3</td><td class="num">-0.881</td><td class="num">[-1.046, -0.715]</td><td><span class="badge orange">Less sensitive</span></td></tr>
+                <tr><td>HOBBIES_1</td><td class="num">-0.680</td><td class="num">[-0.993, -0.366]</td><td><span class="badge orange">Less sensitive</span></td></tr>
                 <tr><td>HOBBIES_2</td><td class="num">-0.719</td><td class="num">[-0.911, -0.527]</td><td><span class="badge orange">Less sensitive</span></td></tr>
                 <tr><td>HOUSEHOLD_1</td><td class="num">-0.458</td><td class="num">[-0.654, -0.262]</td><td><span class="badge orange">Less sensitive</span></td></tr>
                 <tr><td>HOUSEHOLD_2</td><td class="num">-0.353</td><td class="num">[-0.512, -0.195]</td><td><span class="badge orange">Less sensitive</span></td></tr>
@@ -313,7 +313,7 @@
         </article>
       </div>
       <div class="notice"><span class="notice-icon">i</span><div><strong>Model interpretation</strong><p>PPML estimates range from −1.301 (FOODS_1) to −0.353 (HOUSEHOLD_2). Across-store results show material heterogeneity. Observational controls and fixed effects do not remove every time-varying confounder; treat these values as experiment-prioritization evidence.</p></div></div>
-      <div class="sources"><strong>Traceability</strong><p><code>data/processed/module2_pooled/pooled_price_elasticities.csv</code> · <code>data/processed/module2_pooled/pooled_price_elasticities_by_store.csv</code> · <code>data/processed/module2_pooled/item_store_pricing_defaults.csv</code> · <code>outputs/module2/pooled_model_scale_and_store_diagnostics.md</code> · <code>outputs/module2/naive_dml_pooled_comparison.md</code> · model assumptions: <code>assumptions.md</code> (Module 2).</p></div>
+      <div class="sources"><strong>Traceability</strong><p><code>data/processed/module2/price_elasticities.csv</code> · <code>data/processed/module2/same_item_store_stability.csv</code> · <code>outputs/module2/control_ladder.md</code> · <code>data/processed/module2_pooled/pooled_price_elasticities.csv</code> · <code>data/processed/module2_pooled/pooled_price_elasticities_by_store.csv</code> · <code>data/processed/module2_pooled/item_store_pricing_defaults.csv</code> · <code>outputs/module2/module2_interpretation.md</code> · model assumptions: <code>assumptions.md</code> (Module 2).</p></div>
     </section>
 
     <section class="panel" id="module3" role="tabpanel" aria-labelledby="tab-module3" tabindex="0">
@@ -414,10 +414,20 @@
           <div class="rule"><div><div class="rule-label">Cover-eligible products</div><div class="rule-detail">Strict eligibility: stock cover &gt; 8 weeks</div></div><span class="badge">27,086</span></div>
           <div class="rule"><div><div class="rule-label">Median stock cover</div><div class="rule-detail">Under the 13-week sales period assumption</div></div><span class="badge purple">9.98 weeks</span></div>
         </article>
+        <article class="card"><h3>Action counts</h3><p class="sub">Business-rule labels from the scenario output; they describe why the selected markdown was chosen.</p>
+          <div class="rule"><div><div class="rule-label">No markdown - low stock</div><div class="rule-detail">Baseline demand covers opening stock within the horizon</div></div><span class="badge">16,314</span></div>
+          <div class="rule"><div><div class="rule-label">Hold price - markdown not profitable</div><div class="rule-detail">Eligible by cover, but 0% maximizes scenario margin</div></div><span class="badge orange">16,123</span></div>
+          <div class="rule"><div><div class="rule-label">Mark down - high stock, weak sales</div><div class="rule-detail">Positive markdown selected by the profit grid</div></div><span class="badge pink">10,963</span></div>
+        </article>
+      </div>
+      <div class="grid-equal">
         <article class="card"><h3>Profit evidence</h3><p class="sub">Five product profit curves are provided to inspect how markdown choices compare to the fixed 30% baseline.</p>
           <div class="rule"><div><div class="rule-label">Products where pick differs from fixed 30%</div><div class="rule-detail">Mean profit difference among differing products: $1,143.09 each</div></div><span class="badge">41,308</span></div>
           <div class="rule"><div><div class="rule-label">Cost / salvage sensitivity</div><div class="rule-detail">Largest recommendation change in 3×3 grid: 7.7%</div></div><span class="badge orange">3,333 products</span></div>
           <p class="sub" style="margin:11px 0 0">The 16,302 products below horizon demand and 27,086 cover-eligible products do not sum to 43,400 because 12 products are exactly at 8 weeks of cover; the below-horizon test is &lt;8 and eligibility is strictly &gt;8. The reported per-product comparison is not a portfolio-wide profit estimate. Use the profit curves and source audit to understand model behavior.</p>
+        </article>
+        <article class="card"><h3>Season-horizon caution</h3><p class="sub">The four-week scenario is shorter, so more SKUs qualify as having excess cover under the policy rule. That is a scenario consequence, not evidence of a real seasonality pattern in D2.</p>
+          <div class="notice red" style="margin:0"><span class="notice-icon">!</span><div><strong>D2 has no dates</strong><p>The data cannot show a real timing or seasonality pattern. The action label uses the configured horizon only.</p></div></div>
         </article>
       </div>
       <div class="sources"><strong>Traceability</strong><p><code>data/processed/module4/markdown_recommendations.csv</code> · <code>data/processed/module4/markdown_recommendations_audit.json</code> · <code>outputs/module4/evidence/markdown_period_horizon_sensitivity.csv</code> · <code>outputs/module4/evidence/markdown_scenario_evidence.md</code> · five profit curves: <code>outputs/module4/evidence/sku_profit_curves.csv</code> and <code>sku_profit_curves.png</code> · assumptions: <code>assumptions.md</code> (Module 4).</p></div>

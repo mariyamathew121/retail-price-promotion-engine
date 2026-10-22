@@ -28,10 +28,15 @@ choice.
    (`snap_CA`, `snap_TX`, or `snap_WI`).
 6. **Price grain:** M5 sell prices are weekly, so each day in a given M5 week
    receives that week's price and inferred flag.
-7. **Spot-check sample:** the ten SKU-store histories are selected first from
-   combinations with at least one threshold-qualified price drop, then filled
-   with other combinations if fewer than ten have a flagged drop. The generated
-   plot shows weekly observed prices and the prior-eight-week maximum.
+7. **Spot-check sample:** ten SKU-store histories are chosen from combinations
+   with at least one threshold-qualified price drop (other combinations are
+   used only if fewer than ten have one). Selection is greedy and
+   deterministic: fewest already-chosen in the same department, then fewest in
+   the same store, then most flagged weeks, then item and store id. The result
+   covers all seven departments and ten stores. The generated plot shows weekly
+   observed prices and the prior-eight-week maximum. The same logic was also
+   re-derived independently from the raw M5 files for four SKU-stores and
+   matched the Parquet exactly (price, regular price, flag, depth).
 
 These choices are suitable for a reproducible learning baseline, not causal
 proof of promotion exposure. Any later causal or financial decision must
@@ -91,7 +96,7 @@ account for this measurement limitation.
    DoubleML's default IID inference versus consecutive folds and HAC
    uncertainty in the custom estimator, and should be interpreted as a
    point-estimate comparison only. See
-   `outputs/module2/module2_elasticity_interpretation.md` for the results.
+   `outputs/module2/module2_interpretation.md` for the results.
 9. **Pooled fixed-effects diagnostic:** the pooled model selects up to the
    requested number of
    eligible item-store series, allocating the sample as evenly as possible

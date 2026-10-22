@@ -51,11 +51,11 @@ their original sources and place the files as follows:
   `order_products__train.csv`, `products.csv`, `aisles.csv`, and
   `departments.csv` in `data/raw/instacart/`.
 
-From an activated project virtual environment, install the project and run the
-pipelines in dependency order:
+Use Python 3.10 for the project environment. From an activated project virtual
+environment, install the project and run the pipelines in dependency order:
 
 ```powershell
-py -m pip install -e ".[dev]"
+py -3.10 -m pip install -e ".[dev]"
 build-retail-data
 estimate-price-elasticity
 estimate-pooled-elasticity --max-series 10000 --by-store
@@ -91,7 +91,7 @@ From the project root, in PowerShell:
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
-py -m pip install -e ".[dev]"
+py -3.10 -m pip install -e ".[dev]"
 build-retail-data
 ```
 
@@ -142,7 +142,7 @@ After Module 1 has produced the Parquet table, install the updated project
 dependencies and run:
 
 ```powershell
-py -m pip install -e ".[dev]"
+py -3.10 -m pip install -e ".[dev]"
 estimate-price-elasticity
 ```
 
@@ -193,10 +193,10 @@ selected series and an audit JSON are written to
 size. Eligibility rules and limitations are recorded in
 [assumptions.md](assumptions.md).
 
-Module 2 interpretation artifacts, including the generated naive/DML/pooled
-comparison, the authored
+Module 2 interpretation artifacts, including the consolidated
 [`module2_interpretation.md`](outputs/module2/module2_interpretation.md),
-category medians, and positive-elasticity diagnostic plots, are in
+category medians, same-item stability diagnostics, and positive-elasticity
+diagnostic plots, are in
 `outputs/module2/`. Recreate the five largest positive-series plots and their
 diagnostic notes with:
 
@@ -230,7 +230,7 @@ preprocessed `elasticity_subset.csv` from
 to `data/raw/elasticity_subset.csv`, then run:
 
 ```powershell
-py -m pip install -e ".[validation]"
+py -3.10 -m pip install -e ".[validation]"
 validate-module2
 ```
 
@@ -241,7 +241,7 @@ prediction performance, and cross-checks a selected M5 series against
 ignored `data/` paths: `data/processed/module2_validation/` contains the
 learner results CSV, audit JSON, and M5 cross-check JSON. The recorded results
 and interpretation are summarized in
-`outputs/module2/module2_elasticity_interpretation.md`.
+`outputs/module2/module2_interpretation.md`.
 
 ### Module 3: promotion uplift
 
@@ -272,7 +272,7 @@ financial assumptions are documented in
 Install the optional dependency and run the separate exploratory model:
 
 ```powershell
-py -m pip install -e ".[uplift]"
+py -3.10 -m pip install -e ".[uplift]"
 estimate-promotion-tlearner --max-series 1000
 ```
 
@@ -327,9 +327,11 @@ product IDs, and writes each product's maximum-predicted-profit markdown to
 and provenance audit JSON. The CSV uses the brief's fields (`SKU`,
 `current_stock`, `weeks_cover`, `recommended_markdown`, `expected_sales`,
 `expected_margin`, `leftover_inventory`, `action`) plus an `at_risk_unsold`
-flag. `action` labels which business rule applies: no markdown for low stock,
+flag. `action` labels which scenario rule applies: no markdown for low stock,
 hold when a markdown does not pay, mark down for high stock and weak sales, or
-deeper markdown when the horizon is within `--season-ending-weeks` (default 4).
+the configured "season ending" label when the simulated horizon is at most
+`--season-ending-weeks` (default 4). Because D2 has no dates, this is a
+short-horizon scenario consequence, not evidence of a real season pattern.
 Because the dataset is synthetic and its stage
 durations and stock measurement horizon are undocumented, the outputs are
 scenario results under these assumptions, not validated retail
@@ -369,7 +371,7 @@ Place the Instacart CSV files in `data/raw/instacart/`, install the project
 dependencies, and run the bundle-candidate workflow:
 
 ```powershell
-pip install -e .
+py -3.10 -m pip install -e .
 estimate-bundles
 ```
 
