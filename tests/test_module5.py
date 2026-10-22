@@ -109,3 +109,58 @@ def test_fp_growth_crosscheck_matches_three_pair_supports(tmp_path):
 
 def test_validation_status_value_is_fixed():
     assert VALIDATION_STATUS == "Needs cross-price validation"
+
+
+def _write_instacart_fixture(tmp_path):
+    baskets = [[1, 2], [1, 2], [1, 2], [1, 2], [1, 3], [3, 4], [3, 4], [5], [5], [5]]
+    lines = ["order_id,product_id,add_to_cart_order,reordered"]
+    for order, basket in enumerate(baskets, start=1):
+        for position, product in enumerate(basket, start=1):
+            lines.append(f"{order},{product},{position},0")
+    (tmp_path / "order_products__prior.csv").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
+    (tmp_path / "products.csv").write_text(
+        "product_id,product_name,aisle_id,department_id\n"
+        "1,Pasta,1,1\n2,Pasta Sauce,2,1\n3,Soap,3,2\n4,Sponge,4,2\n5,Milk,5,3\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "departments.csv").write_text(
+        "department_id,department\n1,dry goods pasta\n2,household\n3,dairy eggs\n",
+        encoding="utf-8",
+    )
+
+
+def test_fpgrowth_rules_are_directional_ranked_and_flagged(tmp_path):
+    from retail_engine.module5 import RULE_COLUMNS, mine_fpgrowth_rules
+
+    _write_instacart_fixture(tmp_path)
+
+    rules = mine_fpgrowth_rules(
+        tmp_path,
+        sample_size=10,
+        min_support=0.2,
+        min_lift=1.5,
+        candidate_pairs={(1, 2)},
+    )
+
+    assert list(rules.columns) == RULE_COLUMNS
+    assert (rules["lift"] > 1.5).all()
+    assert rules["validation_status"].eq(VALIDATION_STATUS).all()
+    assert rules["rank"].tolist() == list(range(1, len(rules) + 1))
+    ranking = list(zip(rules["lift"], rules["confidence"], rules["support"]))
+    assert ranking == sorted(ranking, reverse=True)
+
+    forward = rules.loc[rules["rule"].eq("IF Pasta THEN Pasta Sauce")].iloc[0]
+    reverse = rules.loc[rules["rule"].eq("IF Pasta Sauce THEN Pasta")].iloc[0]
+    # 4 of 10 orders hold both; Pasta is in 5 orders and Pasta Sauce in 4.
+    assert forward["support"] == pytest.approx(0.4)
+    assert forward["confidence"] == pytest.approx(4 / 5)
+    assert reverse["confidence"] == pytest.approx(1.0)
+    assert forward["lift"] == pytest.approx(0.4 / (0.5 * 0.4))
+    assert forward["m5_category"] == "FOODS"
+    assert bool(forward["in_full_data_candidates"])
+
+    household = rules.loc[rules["rule"].eq("IF Soap THEN Sponge")].iloc[0]
+    assert household["m5_category"] == "HOUSEHOLD"
+    assert not bool(household["in_full_data_candidates"])

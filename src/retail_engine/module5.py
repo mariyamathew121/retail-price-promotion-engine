@@ -13,7 +13,8 @@ from typing import Any
 import duckdb
 import numpy as np
 import pandas as pd
-from mlxtend.frequent_patterns import fpgrowth
+from mlxtend.frequent_patterns import association_rules, fpgrowth
+from scipy.sparse import coo_matrix
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INPUT_DIR = PROJECT_ROOT / "data" / "raw" / "instacart"
@@ -23,6 +24,24 @@ DEFAULT_LIFT_THRESHOLD = 1.5
 SUPPORT_SENSITIVITY = (0.001, 0.0025, 0.005)
 FP_GROWTH_SAMPLE_SIZE = 100_000
 VALIDATION_STATUS = "Needs cross-price validation"
+RULE_COLUMNS = [
+    "rank",
+    "rule",
+    "antecedent_id",
+    "antecedent_name",
+    "antecedent_department",
+    "consequent_id",
+    "consequent_name",
+    "consequent_department",
+    "sample_orders",
+    "support",
+    "confidence",
+    "lift",
+    "leverage",
+    "m5_category",
+    "in_full_data_candidates",
+    "validation_status",
+]
 
 REQUIRED_FILES = (
     "orders.csv",
@@ -251,6 +270,149 @@ def _read_pair_counts(
             departments_path,
         ],
     ).df()
+
+
+def mine_fpgrowth_rules(
+    input_dir: Path,
+    sample_size: int = FP_GROWTH_SAMPLE_SIZE,
+    min_support: float = DEFAULT_SUPPORT_THRESHOLD,
+    min_lift: float = DEFAULT_LIFT_THRESHOLD,
+    candidate_pairs: set[tuple[int, int]] | None = None,
+) -> pd.DataFrame:
+    """Run mlxtend FP-Growth on a deterministic prior-order sample and return rules.
+
+    Baskets are the distinct products in each sampled prior order. Products below
+    the sample support threshold are dropped first; a pair cannot be more frequent
+    than either of its products, so this loses no qualifying pair. Itemsets are
+    limited to pairs, and each pair yields up to two directional rules
+    `IF antecedent THEN consequent`. Rules keep lift strictly above `min_lift`
+    and are ranked by lift, then confidence, then support. Every rule is marked
+    as needing cross-price validation because Instacart has no prices.
+    """
+    if sample_size < 1:
+        raise ValueError("sample_size must be positive")
+    prior_path = str(input_dir / "order_products__prior.csv")
+    with duckdb.connect(":memory:") as connection:
+        connection.execute("SET memory_limit='768MB'")
+        connection.execute("SET threads=2")
+        connection.execute(
+            """
+            CREATE TEMP TABLE sampled_orders AS
+            SELECT order_id
+            FROM (SELECT DISTINCT order_id FROM read_csv_auto(?))
+            ORDER BY hash(order_id)
+            LIMIT ?
+            """,
+            [prior_path, sample_size],
+        )
+        sample_order_ids = np.asarray(
+            [
+                row[0]
+                for row in connection.execute(
+                    "SELECT order_id FROM sampled_orders ORDER BY order_id"
+                ).fetchall()
+            ],
+            dtype=np.int64,
+        )
+        if len(sample_order_ids) != sample_size:
+            raise ValueError(
+                f"Requested {sample_size:,} orders, found {len(sample_order_ids):,}"
+            )
+        transactions = connection.execute(
+            """
+            SELECT DISTINCT sampled.order_id, items.product_id
+            FROM read_csv_auto(?) AS items
+            INNER JOIN sampled_orders AS sampled USING (order_id)
+            """,
+            [prior_path],
+        ).df()
+
+    product_order_counts = transactions.groupby("product_id")["order_id"].nunique()
+    frequent = product_order_counts.index[
+        product_order_counts.ge(int(np.ceil(min_support * sample_size)))
+    ]
+    transactions = transactions.loc[transactions["product_id"].isin(frequent)]
+    if transactions.empty:
+        return pd.DataFrame(columns=RULE_COLUMNS)
+
+    order_positions = pd.Series(
+        np.arange(sample_size, dtype=np.int32), index=sample_order_ids
+    )
+    product_ids = np.sort(transactions["product_id"].unique())
+    product_positions = pd.Series(
+        np.arange(len(product_ids), dtype=np.int32), index=product_ids
+    )
+    basket_matrix = coo_matrix(
+        (
+            np.ones(len(transactions), dtype=np.bool_),
+            (
+                order_positions.loc[transactions["order_id"].to_numpy()].to_numpy(),
+                product_positions.loc[transactions["product_id"].to_numpy()].to_numpy(),
+            ),
+        ),
+        shape=(sample_size, len(product_ids)),
+        dtype=np.bool_,
+    ).tocsr()
+    baskets = pd.DataFrame.sparse.from_spmatrix(
+        basket_matrix, columns=[str(int(product_id)) for product_id in product_ids]
+    ).astype(pd.SparseDtype(np.bool_, fill_value=False))
+    itemsets = fpgrowth(baskets, min_support=min_support, use_colnames=True, max_len=2)
+    if itemsets.empty:
+        return pd.DataFrame(columns=RULE_COLUMNS)
+    rules = association_rules(itemsets, metric="lift", min_threshold=min_lift)
+    rules = rules.loc[
+        rules["antecedents"].map(len).eq(1)
+        & rules["consequents"].map(len).eq(1)
+        & rules["lift"].gt(min_lift)
+    ].copy()
+    if rules.empty:
+        return pd.DataFrame(columns=RULE_COLUMNS)
+
+    rules["antecedent_id"] = rules["antecedents"].map(lambda v: int(next(iter(v))))
+    rules["consequent_id"] = rules["consequents"].map(lambda v: int(next(iter(v))))
+    names = pd.read_csv(input_dir / "products.csv").merge(
+        pd.read_csv(input_dir / "departments.csv"), on="department_id", how="left"
+    )[["product_id", "product_name", "department"]]
+    for role in ("antecedent", "consequent"):
+        rules = rules.merge(
+            names.rename(
+                columns={
+                    "product_id": f"{role}_id",
+                    "product_name": f"{role}_name",
+                    "department": f"{role}_department",
+                }
+            ),
+            on=f"{role}_id",
+            how="left",
+        )
+    rules["m5_category"] = [
+        map_m5_category(str(a), str(b))
+        for a, b in zip(
+            rules["antecedent_department"].fillna(""),
+            rules["consequent_department"].fillna(""),
+            strict=True,
+        )
+    ]
+    known = candidate_pairs or set()
+    rules["in_full_data_candidates"] = [
+        tuple(sorted((a, b))) in known
+        for a, b in zip(rules["antecedent_id"], rules["consequent_id"], strict=True)
+    ]
+    rules["sample_orders"] = sample_size
+    rules["validation_status"] = VALIDATION_STATUS
+    rules["rule"] = (
+        "IF "
+        + rules["antecedent_name"].fillna(rules["antecedent_id"].astype(str))
+        + " THEN "
+        + rules["consequent_name"].fillna(rules["consequent_id"].astype(str))
+    )
+    rules = rules.sort_values(
+        ["lift", "confidence", "support", "antecedent_id", "consequent_id"],
+        ascending=[False, False, False, True, True],
+        kind="stable",
+    ).reset_index(drop=True)
+    rules["rank"] = np.arange(1, len(rules) + 1)
+    return rules[RULE_COLUMNS]
 
 
 def _sample_fp_growth(
@@ -549,6 +711,19 @@ def run_bundle_analysis(
         rank_bundle_candidates(pair_metrics, support_threshold, lift_threshold),
         sample_size,
     )
+    fpgrowth_rules = mine_fpgrowth_rules(
+        input_dir,
+        sample_size,
+        min_support=support_threshold,
+        min_lift=lift_threshold,
+        candidate_pairs={
+            tuple(sorted((int(a), int(b))))
+            for a, b in zip(
+                candidates["item_a"], candidates["item_b"], strict=True
+            )
+        },
+    )
+    fpgrowth_rules.to_csv(output_dir / "fpgrowth_rules.csv", index=False)
     candidates.to_csv(output_dir / "bundle_candidates.csv", index=False)
     sensitivity.to_csv(output_dir / "bundle_support_sensitivity.csv", index=False)
     pair_crosscheck.to_csv(output_dir / "fpgrowth_sample_crosscheck.csv", index=False)

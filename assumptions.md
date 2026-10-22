@@ -179,7 +179,10 @@ account for this measurement limitation.
     command fits CausalML's `BaseTRegressor` using lagged sales, prior-period
     SNAP/event indicators, annual seasonality, and store/category indicators.
     It uses a chronological holdout and reports predicted treatment-effect
-    summaries by store and category. Treatment remains the inferred M5
+    summaries by store and category, plus item-store and product-level tables
+    (`promotion_tlearner_item_store.csv`, `promotion_tlearner_product.csv`) that
+    average the holdout-week predictions. Product-level values are noisy; use
+    the ranking, not the magnitudes. Treatment remains the inferred M5
     price-drop flag; it is not randomized campaign assignment. Therefore these
     results are observational model diagnostics, not causal uplift, and must
     not drive promotion decisions. The optional dependency is installed with
@@ -308,13 +311,23 @@ account for this measurement limitation.
    The train users also appear in the prior history, so validation measures
    pair repeatability for partly familiar customers, not generalization to
    entirely unseen users.
-5. **FP-Growth cross-check:** use mlxtend FP-Growth on a deterministic sample
-   of 100,000 prior orders to cross-check three high-ranked pair supports
-   against direct counts. Limit its basket columns to the six products in
-   those three pairs to keep memory bounded; retain all sampled orders in the
-   support denominator. Full-prior candidate discovery currently uses
-   DuckDB pair counts; the sample FP-Growth run is a cross-check, not full-data
-   FP-Growth mining.
+5. **FP-Growth rules and cross-check:** the brief allows a sample of orders if
+   memory is short, so mlxtend FP-Growth runs on a deterministic sample of
+   100,000 prior orders (ordered by `hash(order_id)`) with pair itemsets only,
+   at the same 0.25% minimum support and lift strictly above 1.5. Products below
+   the support threshold are dropped before mining, which cannot remove a
+   qualifying pair. `association_rules` yields directional rules
+   `IF A THEN B`, ranked by lift, then confidence, then support, and written to
+   `fpgrowth_rules.csv` with product names, departments, `m5_category`, a flag for
+   whether the pair is also in the full-data candidates, and
+   `Needs cross-price validation`. The full-prior shortlist
+   (`bundle_candidates.csv`) is still counted exactly with DuckDB over all prior
+   orders because it covers every order rather than a sample; FP-Growth is not run
+   on the full data. The sample support values of three top pairs are also checked
+   against direct counts (`fpgrowth_sample_crosscheck.csv`), and the top-50 sample
+   pairs are compared with the candidates (`fpgrowth_top50_overlap.csv`). Sample
+   rules can differ from full-data rankings, so treat the rules table as a
+   discovery list and the candidate file as the reference.
 6. **M5 department mapping (assumption):** map `household` to `HOUSEHOLD`;
    map `bakery`, `beverages`, `breakfast`, `bulk`, `canned goods`, `dairy
    eggs`, `deli`, `dry goods pasta`, `frozen`, `international`, `meat

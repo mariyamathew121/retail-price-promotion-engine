@@ -278,7 +278,8 @@ estimate-promotion-tlearner --max-series 1000
 
 This fits CausalML's T-learner on selected item-store weekly series, using
 lagged sales and pre-period calendar/store/category features, and reports
-predicted effects by store and department on a chronological holdout. The
+predicted effects by store and department, and for each item-store and product,
+on a chronological holdout. The
 treatment is still the inferred price-drop flag, not randomized campaign
 assignment. The output is explicitly labelled observational and is **not**
 causal uplift; it must not be used for promotion decisions. A credible causal
@@ -377,12 +378,16 @@ estimate-bundles
 
 The CLI runs from `src/retail_engine/module5.py` and writes
 `data/processed/module5/bundle_candidates.csv`, the support/lift sensitivity
-summary, a source audit, a report, and an mlxtend FP-Growth cross-check. It
-defaults to at least 0.25% prior-order support and prior lift strictly above
-1.5; override with `--min-support` or `--min-lift`. Three ranked pairs are
-cross-checked against mlxtend FP-Growth on a deterministic 100,000-prior-order
-sample. The department-to-M5 category crosswalk and validation caveats are
-documented in [assumptions.md](assumptions.md).
+summary, a source audit, a report, and mlxtend FP-Growth outputs. It defaults to
+at least 0.25% prior-order support and prior lift strictly above 1.5; override
+with `--min-support` or `--min-lift`. mlxtend FP-Growth runs on a deterministic
+100,000-prior-order sample and `association_rules` produces directional
+`IF A THEN B` rules ranked by lift, confidence and support in
+`data/processed/module5/fpgrowth_rules.csv` (each marked
+`Needs cross-price validation` and mapped to an M5 category where possible).
+Three ranked pairs are also cross-checked against direct counts. The
+department-to-M5 category crosswalk and validation caveats are documented in
+[assumptions.md](assumptions.md).
 
 “Bought together” is descriptive co-occurrence, not evidence that the products
 respond to each other's price changes. Association does not establish
