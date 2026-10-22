@@ -42,3 +42,33 @@ def test_weekly_panel_rejects_nonpositive_series_limit(tmp_path):
 def test_weekly_panel_reports_missing_input():
     with pytest.raises(FileNotFoundError, match="Module 1 Parquet"):
         _weekly_panel(Path("missing.parquet"), 1)
+
+
+def test_summarise_predicted_effects_rolls_item_store_rows_up_to_products():
+    from retail_engine.module3_causalml import summarise_predicted_effects
+
+    evaluated = pd.DataFrame(
+        {
+            "item_id": ["A", "A", "A", "A", "B", "B"],
+            "store_id": ["CA_1", "CA_1", "TX_1", "TX_1", "CA_1", "CA_1"],
+            "cat_id": ["FOODS"] * 6,
+            "treatment": [1, 0, 0, 0, 0, 0],
+            "units_sold": [20.0, 10.0, 8.0, 12.0, 5.0, 7.0],
+            "predicted_treatment_effect_units": [4.0, 2.0, 6.0, 8.0, 1.0, 1.0],
+        }
+    )
+
+    item_store = summarise_predicted_effects(evaluated, ["item_id", "store_id", "cat_id"])
+    product = summarise_predicted_effects(evaluated, ["item_id", "cat_id"]).set_index("item_id")
+
+    assert len(item_store) == 3
+    assert list(item_store["item_id"]) == ["A", "A", "B"]  # sorted by mean predicted effect
+    assert item_store.iloc[0]["store_id"] == "TX_1"
+    assert product.loc["A", "series_count"] == 2
+    assert product.loc["A", "evaluation_rows"] == 4
+    assert product.loc["A", "promotion_rows"] == 1
+    assert product.loc["A", "mean_predicted_treatment_effect_units"] == pytest.approx(5.0)
+    assert product.loc["A", "observed_promotion_mean_units"] == pytest.approx(20.0)
+    assert product.loc["A", "observed_control_mean_units"] == pytest.approx(10.0)
+    assert pd.isna(product.loc["B", "observed_promotion_mean_units"])
+    assert product.loc["B", "series_count"] == 1

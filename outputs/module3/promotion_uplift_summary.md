@@ -57,6 +57,27 @@ generalizable campaign effect. Check sparse-history and inventory context
 before acting. The two post-promotion weeks were available for 98.8% of
 complete episodes.
 
+## Post-promotion dip
+
+Research question 4 asks whether customers stock up during a promotion and buy
+less afterwards. The check compares units in the two weeks after each episode
+with the baseline rate (`post_promo_dip_units`; negative means a dip). It is
+summarised in `promotion_uplift_audit.json` under `post_promotion_dip_summary`
+and is diagnostic only: it does not change the recommendation.
+
+| Episodes (complete, both post weeks observed) | Count | Share below baseline | Median post vs baseline |
+|---|---:|---:|---:|
+| All | 15,475 | 35.8% | +5.3% |
+| Excluding possible permanent price cuts | 8,769 | 37.3% | +6.8% |
+| Possible permanent price cuts only | 6,706 | 33.8% | 0.0% |
+
+Median relative change uses episodes with a positive baseline. **There is no
+evidence of a typical post-promotion dip in this proxy data**: the median
+episode sells slightly *more* than baseline afterwards, and only about a third
+sit below it. A dip may still exist for individual SKUs, and a flat result is
+also what weekly-grain data with sparse sales and a price-drop proxy for
+promotions would produce, so this does not show that stockpiling never happens.
+
 ## Hand-calculated checks
 
 `tests/test_module3.py::test_three_hand_calculated_promotion_examples` checks

@@ -270,6 +270,53 @@ def _weekly_promotion_data(parquet_path: Path) -> pd.DataFrame:
         ).df()
 
 
+def post_promotion_dip_summary(results: pd.DataFrame) -> dict[str, object]:
+    """Summarise whether sales fall below baseline in the weeks after a promotion.
+
+    Uses completely evaluated episodes with every post-promotion week observed.
+    `post_promo_dip_units` is post-promotion units minus baseline units over the
+    same weeks, so a negative value is a dip. The share and median relative
+    change exclude zero-baseline episodes, where a ratio is undefined. Possible
+    permanent price cuts are reported separately because sales after them are
+    not a post-promotion period.
+    """
+    if results.empty:
+        return {}
+    observed = results.loc[
+        results["analysis_status"].eq("complete")
+        & results["post_promo_weeks_observed"].eq(POST_PROMO_WEEKS)
+    ]
+
+    def describe(group: pd.DataFrame) -> dict[str, object]:
+        positive_baseline = group.loc[group["baseline_units_per_week"] > 0]
+        relative = positive_baseline["post_promo_dip_units"] / (
+            positive_baseline["baseline_units_per_week"] * POST_PROMO_WEEKS
+        )
+        return {
+            "episodes": int(len(group)),
+            "share_below_baseline": (
+                float((group["post_promo_dip_units"] < 0).mean())
+                if len(group)
+                else None
+            ),
+            "median_post_minus_baseline_units": (
+                float(group["post_promo_dip_units"].median()) if len(group) else None
+            ),
+            "episodes_with_positive_baseline": int(len(positive_baseline)),
+            "median_post_vs_baseline_change": (
+                float(relative.median()) if len(relative) else None
+            ),
+        }
+
+    persistent = observed["price_persists"].astype(bool)
+    return {
+        "post_promotion_weeks": POST_PROMO_WEEKS,
+        "all_complete_episodes": describe(observed),
+        "excluding_possible_permanent_price_cuts": describe(observed.loc[~persistent]),
+        "possible_permanent_price_cuts_only": describe(observed.loc[persistent]),
+    }
+
+
 def _audit_summary(
     results: pd.DataFrame,
     parquet_path: Path,
@@ -323,6 +370,7 @@ def _audit_summary(
         "promotions_evaluated": len(results),
         "analysis_status_counts": status_counts,
         "recommendation_counts": recommendation_counts,
+        "post_promotion_dip_summary": post_promotion_dip_summary(results),
         "output_file": "promotion_uplift.csv",
     }
 
@@ -355,6 +403,18 @@ def build_promotion_uplift(
     return results
 
 
+def refresh_audit(output_dir: Path, parquet_path: Path) -> dict[str, object]:
+    """Rebuild the audit JSON from the existing results CSV without re-running."""
+    audit_path = output_dir / "promotion_uplift_audit.json"
+    previous = json.loads(audit_path.read_text(encoding="utf-8")) if audit_path.is_file() else {}
+    results = pd.read_csv(output_dir / "promotion_uplift.csv")
+    audit = _audit_summary(
+        results, parquet_path, previous.get("gross_margin_rate_override")
+    )
+    audit_path.write_text(json.dumps(audit, indent=2), encoding="utf-8")
+    return audit
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -375,7 +435,16 @@ def main() -> None:
         default=None,
         help="Override the assumed category-specific regular-price gross margins",
     )
+    parser.add_argument(
+        "--refresh-audit",
+        action="store_true",
+        help="Rebuild only the audit JSON from the existing results CSV",
+    )
     args = parser.parse_args()
+    if args.refresh_audit:
+        audit = refresh_audit(args.output_dir, args.parquet)
+        print(json.dumps(audit["post_promotion_dip_summary"], indent=2))
+        return
     results = build_promotion_uplift(
         args.parquet,
         args.output_dir,

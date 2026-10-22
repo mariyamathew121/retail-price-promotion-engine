@@ -160,3 +160,29 @@ def test_invalid_margin_rates_are_rejected(margin_rate):
             _promotion_example("invalid_margin", (20, 20), 9.0),
             gross_margin_rate=margin_rate,
         )
+
+
+def test_post_promotion_dip_summary_separates_dips_and_permanent_cuts():
+    from retail_engine.module3 import post_promotion_dip_summary
+
+    results = pd.DataFrame(
+        {
+            "analysis_status": ["complete"] * 4 + ["insufficient_baseline"],
+            "post_promo_weeks_observed": [2, 2, 2, 1, 2],
+            "price_persists": [False, False, True, False, False],
+            "baseline_units_per_week": [10.0, 10.0, 5.0, 10.0, 10.0],
+            "post_promo_dip_units": [-4.0, 6.0, 2.0, -9.0, -9.0],
+        }
+    )
+
+    summary = post_promotion_dip_summary(results)
+
+    # The one-week-observed and insufficient-baseline rows are excluded.
+    assert summary["all_complete_episodes"]["episodes"] == 3
+    assert summary["all_complete_episodes"]["share_below_baseline"] == pytest.approx(1 / 3)
+    clean = summary["excluding_possible_permanent_price_cuts"]
+    assert clean["episodes"] == 2
+    assert clean["share_below_baseline"] == pytest.approx(0.5)
+    # -4 / (10 * 2) = -0.20 and +6 / (10 * 2) = +0.30, so the median is +0.05.
+    assert clean["median_post_vs_baseline_change"] == pytest.approx(0.05)
+    assert summary["possible_permanent_price_cuts_only"]["episodes"] == 1

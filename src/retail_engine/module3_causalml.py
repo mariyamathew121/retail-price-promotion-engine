@@ -42,6 +42,18 @@ OUTPUT_COLUMNS = [
     "treatment_effect_p90_units",
     "interpretation",
 ]
+EFFECT_COLUMNS = [
+    "series_count",
+    "evaluation_rows",
+    "promotion_rows",
+    "observed_promotion_mean_units",
+    "observed_control_mean_units",
+    "mean_predicted_treatment_effect_units",
+    "median_predicted_treatment_effect_units",
+    "interpretation",
+]
+ITEM_STORE_COLUMNS = ["item_id", "store_id", "cat_id", *EFFECT_COLUMNS]
+PRODUCT_COLUMNS = ["item_id", "cat_id", *EFFECT_COLUMNS]
 INTERPRETATION = (
     "Observational CATE diagnostic only; inferred price-drop exposure is not "
     "randomized and estimates are not causal effects or recommendations."
@@ -195,9 +207,63 @@ def _fit_predict(
             f"shape {treatment_effect.shape}"
         )
 
-    evaluated = data.loc[test_mask, ["cat_id", "store_id", "week_start", "treatment", "units_sold"]].copy()
+    evaluated = data.loc[
+        test_mask,
+        ["item_id", "cat_id", "store_id", "week_start", "treatment", "units_sold"],
+    ].copy()
     evaluated["predicted_treatment_effect_units"] = treatment_effect[:, 0]
     return evaluated
+
+
+def summarise_predicted_effects(
+    evaluated: pd.DataFrame, group_columns: list[str]
+) -> pd.DataFrame:
+    """Aggregate row-level predicted effects (item-store-weeks) to a coarser level.
+
+    Rows are the chronological-holdout weeks. `mean_predicted_treatment_effect_units`
+    is the average predicted extra units per item-store-week if promoted, taken over
+    all holdout weeks of the group (not only promoted ones), so it describes expected
+    responsiveness. The observed promoted/control means are raw holdout averages and
+    are NaN when a group has no promoted (or no control) weeks.
+    """
+    frame = evaluated.copy()
+    frame["series_key"] = frame["item_id"].astype(str) + "|" + frame["store_id"].astype(str)
+    grouped = frame.groupby(group_columns, as_index=False, sort=True)
+    result = grouped.agg(
+        series_count=("series_key", "nunique"),
+        evaluation_rows=("treatment", "size"),
+        promotion_rows=("treatment", "sum"),
+        mean_predicted_treatment_effect_units=(
+            "predicted_treatment_effect_units",
+            "mean",
+        ),
+        median_predicted_treatment_effect_units=(
+            "predicted_treatment_effect_units",
+            "median",
+        ),
+    )
+    promoted = (
+        frame.loc[frame["treatment"].eq(1)]
+        .groupby(group_columns)["units_sold"]
+        .mean()
+        .rename("observed_promotion_mean_units")
+    )
+    control = (
+        frame.loc[frame["treatment"].eq(0)]
+        .groupby(group_columns)["units_sold"]
+        .mean()
+        .rename("observed_control_mean_units")
+    )
+    result = result.merge(promoted, on=group_columns, how="left").merge(
+        control, on=group_columns, how="left"
+    )
+    result["interpretation"] = INTERPRETATION
+    columns = [*group_columns, *EFFECT_COLUMNS]
+    return result[columns].sort_values(
+        ["mean_predicted_treatment_effect_units", *group_columns],
+        ascending=[False, *([True] * len(group_columns))],
+        kind="stable",
+    ).reset_index(drop=True)
 
 
 def estimate_observational_promotion_effects(
@@ -272,6 +338,14 @@ def estimate_observational_promotion_effects(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     results.to_csv(output_dir / "promotion_tlearner_observational.csv", index=False)
+    item_store = summarise_predicted_effects(evaluated, ["item_id", "store_id", "cat_id"])
+    product = summarise_predicted_effects(evaluated, ["item_id", "cat_id"])
+    item_store[ITEM_STORE_COLUMNS].to_csv(
+        output_dir / "promotion_tlearner_item_store.csv", index=False
+    )
+    product[PRODUCT_COLUMNS].to_csv(
+        output_dir / "promotion_tlearner_product.csv", index=False
+    )
     audit = {
         "source_file": str(parquet_path),
         "method": "CausalML BaseTRegressor T-learner with random-forest outcome models",
@@ -306,6 +380,14 @@ def estimate_observational_promotion_effects(
             "remain. Do not interpret as causal uplift or use for decisions."
         ),
         "output_file": "promotion_tlearner_observational.csv",
+        "item_store_output_file": "promotion_tlearner_item_store.csv",
+        "product_output_file": "promotion_tlearner_product.csv",
+        "product_level_note": (
+            "Item-store rows give store-by-product predictions; product rows pool "
+            "the same item across the selected stores. With a chronological holdout "
+            "of about one year, per-item estimates are noisy and only the ranking "
+            "within the selected series should be read, not the magnitudes."
+        ),
     }
     (output_dir / "promotion_tlearner_observational_audit.json").write_text(
         json.dumps(audit, indent=2) + "\n",
@@ -341,6 +423,8 @@ def main() -> None:
         max_series=args.max_series,
     )
     print(f"Department/store observational estimates: {len(results)}")
+    print(f"Item-store estimates: {args.output_dir / 'promotion_tlearner_item_store.csv'}")
+    print(f"Product estimates: {args.output_dir / 'promotion_tlearner_product.csv'}")
     print(f"Results: {args.output_dir / 'promotion_tlearner_observational.csv'}")
     print(f"Audit: {args.output_dir / 'promotion_tlearner_observational_audit.json'}")
 
