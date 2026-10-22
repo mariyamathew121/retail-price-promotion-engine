@@ -193,7 +193,7 @@ selected series and an audit JSON are written to
 size. Eligibility rules and limitations are recorded in
 [assumptions.md](assumptions.md).
 
-Module 2 interpretation artifacts, including the consolidated
+Module 2 interpretation, including the consolidated
 [`module2_interpretation.md`](outputs/module2/module2_interpretation.md),
 category medians, same-item stability diagnostics, and positive-elasticity
 diagnostic plots, are in
@@ -293,11 +293,16 @@ estimate-promotion-tlearner --max-series 1000
 ```
 
 This fits CausalML's T-learner on selected item-store weekly series, using
-lagged sales and pre-period calendar/store/category features, and reports
-predicted effects by store and department, and for each item-store and product,
-on a chronological holdout. The
-treatment is still the inferred price-drop flag, not randomized campaign
-assignment. The output is explicitly labelled observational and is **not**
+lagged sales and pre-period calendar/store/category features. It reports
+predicted effects by store and department, and by item-store and product, on a
+chronological holdout. The treatment is still the inferred price-drop flag, not
+randomized campaign assignment.
+
+**Product-level results are thin evidence and must not be used for ranking.**
+Each product row carries a `thin_promotion_evidence` flag. A row is flagged when
+it has fewer than 10 promoted holdout weeks, which covers most products in the
+current run (305 of 357). Use the product tables only to see which products have
+any usable promotion history. The output is explicitly labelled observational and is **not**
 causal uplift; it must not be used for promotion decisions. A credible causal
 estimate requires real assigned treatment/control records. The experiment
 contract and validation checklist are in
@@ -401,8 +406,11 @@ with `--min-support` or `--min-lift`. mlxtend FP-Growth runs on a deterministic
 `IF A THEN B` rules ranked by lift, confidence and support in
 `data/processed/module5/fpgrowth_rules.csv` (each marked
 `Needs cross-price validation` and mapped to an M5 category where possible).
-Three ranked pairs are also cross-checked against direct counts. The
-department-to-M5 category crosswalk and validation caveats are documented in
+The 311-candidate shortlist (`bundle_candidates.csv`) is counted exactly over
+all prior orders with DuckDB. The FP-Growth rules come from the 100,000-order
+sample, so their rankings can differ from the full-data shortlist. Three ranked
+pairs are also checked against direct counts. The department-to-M5 category
+crosswalk and validation caveats are documented in
 [assumptions.md](assumptions.md).
 
 “Bought together” is descriptive co-occurrence, not evidence that the products
