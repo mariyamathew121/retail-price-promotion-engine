@@ -28,6 +28,17 @@ holdout. Because the treatment is still the inferred M5 price-drop flag, these
 outputs are observational diagnostics, not causal uplift estimates or
 promotion recommendations.
 
+The same run also writes store-by-product and product-level tables
+(`promotion_tlearner_item_store.csv`: 1,000 rows; `promotion_tlearner_product.csv`:
+357 products pooled across their selected stores). **Product-level evidence is
+thin.** The holdout is about one year, so most series have few promoted weeks: 975
+of 1,000 item-store rows and 305 of 357 products have fewer than 10 promoted
+holdout weeks and are flagged `thin_promotion_evidence`. Only 52 products have
+enough promoted weeks, and for those the predicted effect correlates just 0.18
+with the raw observed promoted-minus-control sales gap. Use the product tables to
+see which products have any usable promotion history, not to rank products or
+choose promotions; the category-by-store summaries are the more reliable view.
+
 ## Run totals
 
 | Result | Count |

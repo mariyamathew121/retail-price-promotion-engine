@@ -59,7 +59,9 @@ def test_summarise_predicted_effects_rolls_item_store_rows_up_to_products():
     )
 
     item_store = summarise_predicted_effects(evaluated, ["item_id", "store_id", "cat_id"])
-    product = summarise_predicted_effects(evaluated, ["item_id", "cat_id"]).set_index("item_id")
+    product = summarise_predicted_effects(
+        evaluated, ["item_id", "cat_id"], min_promotion_rows=1
+    ).set_index("item_id")
 
     assert len(item_store) == 3
     assert list(item_store["item_id"]) == ["A", "A", "B"]  # sorted by mean predicted effect
@@ -72,3 +74,8 @@ def test_summarise_predicted_effects_rolls_item_store_rows_up_to_products():
     assert product.loc["A", "observed_control_mean_units"] == pytest.approx(10.0)
     assert pd.isna(product.loc["B", "observed_promotion_mean_units"])
     assert product.loc["B", "series_count"] == 1
+    # A has one promoted week (enough at a threshold of 1); B has none.
+    assert not product.loc["A", "thin_promotion_evidence"]
+    assert product.loc["B", "thin_promotion_evidence"]
+    default = summarise_predicted_effects(evaluated, ["item_id", "cat_id"])
+    assert default["thin_promotion_evidence"].all()  # all have fewer than 10 promoted weeks

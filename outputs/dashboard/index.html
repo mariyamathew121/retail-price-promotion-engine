@@ -372,10 +372,12 @@
           <div class="rule"><div><div class="rule-label">Zero-unit baseline</div><div class="rule-detail">3,271 episodes among the complete set</div></div><span class="badge orange">20.9%</span></div>
           <div class="rule"><div><div class="rule-label">Promo sales ≤ baseline</div><div class="rule-detail">6,556 episodes among the complete set</div></div><span class="badge red">41.8%</span></div>
           <div class="rule"><div><div class="rule-label">Two post-promotion weeks available</div><div class="rule-detail">Of complete episodes</div></div><span class="badge">98.8%</span></div>
+          <div class="rule"><div><div class="rule-label">Post-promotion dip</div><div class="rule-detail">Median units in the two weeks after are 5.3% above baseline; 35.8% of episodes fall below it, so no typical dip</div></div><span class="badge">No dip</span></div>
+          <div class="rule"><div><div class="rule-label">Product-level CausalML</div><div class="rule-detail">305 of 357 products have fewer than 10 promoted holdout weeks; treat product tables as thin evidence, not a ranking</div></div><span class="badge orange">Thin</span></div>
           <p class="sub" style="margin:10px 0 0">Gross margins are assumed (FOODS 25%, HOUSEHOLD 35%, HOBBIES 40%). Sparse baselines, inventory and inferred exposure can materially affect the results.</p>
         </article>
       </div>
-      <div class="sources"><strong>Traceability</strong><p><code>data/processed/module3/promotion_uplift.csv</code> · <code>data/processed/module3/promotion_uplift_audit.json</code> · optional CausalML diagnostic: <code>data/processed/module3_causalml/promotion_tlearner_observational.csv</code> · <code>outputs/module3/promotion_uplift_summary.md</code> · hand-calculated checks: <code>tests/test_module3.py</code> and <code>tests/test_module3_causalml.py</code> · assumptions: <code>assumptions.md</code> (Module 3).</p></div>
+      <div class="sources"><strong>Traceability</strong><p><code>data/processed/module3/promotion_uplift.csv</code> · <code>data/processed/module3/promotion_uplift_audit.json</code> · optional CausalML diagnostic: <code>data/processed/module3_causalml/promotion_tlearner_observational.csv</code> · <code>data/processed/module3_causalml/promotion_tlearner_product.csv</code> · <code>outputs/module3/promotion_uplift_summary.md</code> · hand-calculated checks: <code>tests/test_module3.py</code> and <code>tests/test_module3_causalml.py</code> · assumptions: <code>assumptions.md</code> (Module 3).</p></div>
     </section>
 
     <section class="panel" id="module4" role="tabpanel" aria-labelledby="tab-module4" tabindex="0">
@@ -457,12 +459,13 @@
           <h3>Validation is not optional</h3><p class="sub">A high lift ranks co-occurrence against chance under the sample; it does not show that promotions or price changes cause complementary demand.</p>
           <div class="notice red"><span class="notice-icon">!</span><div><strong>No price data in Instacart</strong><p>These candidates cannot estimate cross-price elasticity or bundle-induced incremental sales from the basket dataset alone.</p></div></div>
           <div class="rule"><div><div class="rule-label">Working thresholds</div><div class="rule-detail">Prior-order support ≥0.25% and lift strictly above 1.5</div></div><span class="badge">Filter</span></div>
+          <div class="rule"><div><div class="rule-label">FP-Growth rules</div><div class="rule-detail">606 directional IF-THEN rules (303 pairs) from mlxtend FP-Growth on a 100,000-order sample, ranked by lift, confidence, support</div></div><span class="badge purple">Rules</span></div>
           <div class="rule"><div><div class="rule-label">FP-Growth check</div><div class="rule-detail">45 of the sampled top 50 also occur in the full-prior candidate file</div></div><span class="badge purple">Cross-check</span></div>
           <div class="rule"><div><div class="rule-label">Category mapping</div><div class="rule-detail">311 candidate pairs map to FOODS using the project crosswalk</div></div><span class="badge orange">Assumption</span></div>
           <div class="notice purple"><span class="notice-icon">i</span><div><strong>Recommended next validation</strong><p>Test candidate pairs with price and promotion variation, using a designed experiment or credible causal method before pricing, bundle or cross-sell action.</p></div></div>
         </article>
       </div>
-      <div class="sources"><strong>Traceability</strong><p><code>data/processed/module5/bundle_candidates.csv</code> · <code>data/processed/module5/bundle_candidate_summary.md</code> · <code>data/processed/module5/fpgrowth_top50_overlap.csv</code> · cross-check script: <code>outputs/module5/fpgrowth_top50_overlap.py</code> · assumptions: <code>assumptions.md</code> (Module 5).</p></div>
+      <div class="sources"><strong>Traceability</strong><p><code>data/processed/module5/bundle_candidates.csv</code> · <code>data/processed/module5/bundle_candidate_summary.md</code> · <code>data/processed/module5/fpgrowth_rules.csv</code> · <code>data/processed/module5/fpgrowth_top50_overlap.csv</code> · cross-check script: <code>outputs/module5/fpgrowth_top50_overlap.py</code> · assumptions: <code>assumptions.md</code> (Module 5).</p></div>
     </section>
 
     <footer class="footer"><span>Retail Price &amp; Promotion Decision Engine · Project review dashboard</span><span>All monetary/profit outputs are estimates under documented assumptions.</span></footer>

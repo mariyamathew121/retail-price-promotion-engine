@@ -181,8 +181,12 @@ account for this measurement limitation.
     It uses a chronological holdout and reports predicted treatment-effect
     summaries by store and category, plus item-store and product-level tables
     (`promotion_tlearner_item_store.csv`, `promotion_tlearner_product.csv`) that
-    average the holdout-week predictions. Product-level values are noisy; use
-    the ranking, not the magnitudes. Treatment remains the inferred M5
+    average the holdout-week predictions. Rows with fewer than 10 promoted
+    holdout weeks are flagged `thin_promotion_evidence` (975 of 1,000 item-store
+    rows and 305 of 357 products in the current run) and must not be ranked or
+    acted on; even for the adequately supported products the predicted effect
+    correlates only weakly (0.18) with the raw promoted-minus-control gap.
+    Treatment remains the inferred M5
     price-drop flag; it is not randomized campaign assignment. Therefore these
     results are observational model diagnostics, not causal uplift, and must
     not drive promotion decisions. The optional dependency is installed with

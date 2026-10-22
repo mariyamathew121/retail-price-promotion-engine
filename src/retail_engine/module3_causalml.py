@@ -15,6 +15,7 @@ from retail_engine.module2 import WEEK_START_SQL
 
 DEFAULT_MAX_SERIES = 1_000
 MIN_TREATMENT_ROWS = 50
+MIN_RELIABLE_PROMOTION_ROWS = 10
 RANDOM_STATE = 123
 FEATURE_COLUMNS = [
     "lag_1_units",
@@ -46,6 +47,7 @@ EFFECT_COLUMNS = [
     "series_count",
     "evaluation_rows",
     "promotion_rows",
+    "thin_promotion_evidence",
     "observed_promotion_mean_units",
     "observed_control_mean_units",
     "mean_predicted_treatment_effect_units",
@@ -216,7 +218,9 @@ def _fit_predict(
 
 
 def summarise_predicted_effects(
-    evaluated: pd.DataFrame, group_columns: list[str]
+    evaluated: pd.DataFrame,
+    group_columns: list[str],
+    min_promotion_rows: int = MIN_RELIABLE_PROMOTION_ROWS,
 ) -> pd.DataFrame:
     """Aggregate row-level predicted effects (item-store-weeks) to a coarser level.
 
@@ -225,6 +229,9 @@ def summarise_predicted_effects(
     all holdout weeks of the group (not only promoted ones), so it describes expected
     responsiveness. The observed promoted/control means are raw holdout averages and
     are NaN when a group has no promoted (or no control) weeks.
+    `thin_promotion_evidence` is true when the group has fewer than
+    `min_promotion_rows` promoted holdout weeks; the predicted effect for such a
+    group is extrapolated from few observations and should not be ranked or acted on.
     """
     frame = evaluated.copy()
     frame["series_key"] = frame["item_id"].astype(str) + "|" + frame["store_id"].astype(str)
@@ -257,6 +264,7 @@ def summarise_predicted_effects(
     result = result.merge(promoted, on=group_columns, how="left").merge(
         control, on=group_columns, how="left"
     )
+    result["thin_promotion_evidence"] = result["promotion_rows"] < min_promotion_rows
     result["interpretation"] = INTERPRETATION
     columns = [*group_columns, *EFFECT_COLUMNS]
     return result[columns].sort_values(
@@ -385,8 +393,10 @@ def estimate_observational_promotion_effects(
         "product_level_note": (
             "Item-store rows give store-by-product predictions; product rows pool "
             "the same item across the selected stores. With a chronological holdout "
-            "of about one year, per-item estimates are noisy and only the ranking "
-            "within the selected series should be read, not the magnitudes."
+            "of about one year, per-item estimates are noisy: rows flagged "
+            "thin_promotion_evidence have fewer than "
+            f"{MIN_RELIABLE_PROMOTION_ROWS} promoted holdout weeks and should not be "
+            "ranked or acted on."
         ),
     }
     (output_dir / "promotion_tlearner_observational_audit.json").write_text(

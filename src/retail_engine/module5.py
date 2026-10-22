@@ -406,11 +406,21 @@ def mine_fpgrowth_rules(
         + " THEN "
         + rules["consequent_name"].fillna(rules["consequent_id"].astype(str))
     )
-    rules = rules.sort_values(
-        ["lift", "confidence", "support", "antecedent_id", "consequent_id"],
-        ascending=[False, False, False, True, True],
-        kind="stable",
-    ).reset_index(drop=True)
+    # The two directions of a pair share one lift only up to floating-point noise,
+    # so round before sorting or the order would follow noise rather than confidence.
+    rules = (
+        rules.assign(
+            lift_rank=rules["lift"].round(9),
+            confidence_rank=rules["confidence"].round(9),
+        )
+        .sort_values(
+            ["lift_rank", "confidence_rank", "support", "antecedent_id", "consequent_id"],
+            ascending=[False, False, False, True, True],
+            kind="stable",
+        )
+        .drop(columns=["lift_rank", "confidence_rank"])
+        .reset_index(drop=True)
+    )
     rules["rank"] = np.arange(1, len(rules) + 1)
     return rules[RULE_COLUMNS]
 

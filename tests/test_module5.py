@@ -148,11 +148,20 @@ def test_fpgrowth_rules_are_directional_ranked_and_flagged(tmp_path):
     assert (rules["lift"] > 1.5).all()
     assert rules["validation_status"].eq(VALIDATION_STATUS).all()
     assert rules["rank"].tolist() == list(range(1, len(rules) + 1))
-    ranking = list(zip(rules["lift"], rules["confidence"], rules["support"]))
+    ranking = list(
+        zip(
+            rules["lift"].round(9),
+            rules["confidence"].round(9),
+            rules["support"],
+        )
+    )
     assert ranking == sorted(ranking, reverse=True)
 
     forward = rules.loc[rules["rule"].eq("IF Pasta THEN Pasta Sauce")].iloc[0]
     reverse = rules.loc[rules["rule"].eq("IF Pasta Sauce THEN Pasta")].iloc[0]
+    # Same pair, same lift: the higher-confidence direction must rank first.
+    assert reverse["confidence"] > forward["confidence"]
+    assert reverse["rank"] < forward["rank"]
     # 4 of 10 orders hold both; Pasta is in 5 orders and Pasta Sauce in 4.
     assert forward["support"] == pytest.approx(0.4)
     assert forward["confidence"] == pytest.approx(4 / 5)

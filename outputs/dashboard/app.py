@@ -418,9 +418,28 @@ def module3_page() -> None:
             use_container_width=True,
             hide_index=True,
         )
+    product_path = "data/processed/module3_causalml/promotion_tlearner_product.csv"
+    product = load_csv(product_path)
+    if product is not None:
+        thin = product["thin_promotion_evidence"].astype(str).str.lower().eq("true")
+        st.markdown("#### Product-level CausalML diagnostic")
+        st.caption(
+            f"{int(thin.sum()):,} of {len(product):,} products have fewer than 10 promoted "
+            "holdout weeks (thin evidence). Rows are limited to products with enough "
+            "promoted weeks; use them to see which products have usable promotion history, "
+            "not to rank products or choose promotions."
+        )
+        st.dataframe(
+            product.loc[~thin].sort_values(
+                "mean_predicted_treatment_effect_units", ascending=False
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
     source_note([
         path,
         "data/processed/module3/promotion_uplift_audit.json",
+        product_path,
         tlearner_path,
         "data/processed/module3_causalml/promotion_tlearner_observational_audit.json",
         "outputs/module3/promotion_uplift_summary.md",
@@ -553,12 +572,30 @@ def module5_page() -> None:
         use_container_width=True,
         hide_index=True,
     )
+    rules_path = "data/processed/module5/fpgrowth_rules.csv"
+    rules = load_csv(rules_path)
+    if rules is not None:
+        st.markdown("#### FP-Growth rules (IF A THEN B)")
+        st.caption(
+            f"{len(rules):,} directional rules from mlxtend FP-Growth on a 100,000-order "
+            "sample, ranked by lift, confidence, then support. Every rule needs "
+            "cross-price validation."
+        )
+        st.dataframe(
+            rules.head(50)[
+                ["rank", "rule", "support", "confidence", "lift", "m5_category",
+                 "in_full_data_candidates", "validation_status"]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
     if overlap is not None:
         st.markdown("#### FP-Growth sample top 50")
         st.dataframe(overlap, use_container_width=True, hide_index=True)
     source_note(
         [
             path,
+            rules_path,
             "data/processed/module5/bundle_candidate_summary.md",
             overlap_path,
         ]
