@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Proof and What-if</title>
+<style>
+:root {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --fg: #1f2433;
+  --muted: #5d6478;
+  --line: #e1e4ee;
+  --blue: #4466e8;
+  --blue-soft: #edf1ff;
+  --purple: #805ad5;
+  --orange: #e8833d;
+  --orange-soft: #fff3e8;
+  --pink: #dc5797;
+  --pink-soft: #fff0f7;
+  --red: #d94b55;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141722;
+    --surface: #1c2130;
+    --fg: #eef0f7;
+    --muted: #a2a8bb;
+    --line: #2d3446;
+    --blue: #8fa8f5;
+    --blue-soft: #222b47;
+    --purple: #b29cf0;
+    --orange: #f0a06a;
+    --orange-soft: #3a2d24;
+    --pink: #ef8cc0;
+    --pink-soft: #3a2432;
+    --red: #ef8a8f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141722;
+  --surface: #1c2130;
+  --fg: #eef0f7;
+  --muted: #a2a8bb;
+  --line: #2d3446;
+  --blue: #8fa8f5;
+  --blue-soft: #222b47;
+  --purple: #b29cf0;
+  --orange: #f0a06a;
+  --orange-soft: #3a2d24;
+  --pink: #ef8cc0;
+  --pink-soft: #3a2432;
+  --red: #ef8a8f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.6 -apple-system, "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 980px; margin: 0 auto; padding-block: 32px 56px; }
+h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 20px; margin: 40px 0 6px; text-wrap: balance; }
+h3 { font-size: 15px; margin: 0 0 4px; }
+p { margin: 0 0 10px; max-width: 66ch; }
+.muted { color: var(--muted); }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.banner {
+  background: var(--orange-soft);
+  border: 1px solid var(--orange);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 18px 0 0;
+  font-size: 14px;
+}
+.banner strong { color: var(--orange); }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px;
+  min-width: 0;
+}
+.grid { display: grid; gap: 14px; grid-template-columns: 1fr; margin-top: 14px; }
+@media (min-width: 720px) { .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 720px) { .grid-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); } }
+.kpi { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; margin: 2px 0; }
+.bar-row { display: grid; grid-template-columns: 74px 1fr 56px; gap: 10px; align-items: center; margin: 8px 0; font-size: 13px; }
+.bar-track { background: var(--line); border-radius: 6px; height: 14px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 6px; }
+.bar-fill.naive { background: var(--muted); }
+.bar-fill.model { background: var(--blue); }
+.bar-value { font-variant-numeric: tabular-nums; text-align: right; }
+.badge {
+  display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--blue-soft); color: var(--blue);
+}
+.badge.sensitive { background: var(--pink-soft); color: var(--pink); border-color: var(--pink); }
+.badge.unclear { background: var(--orange-soft); color: var(--orange); border-color: var(--orange); }
+.controls { display: grid; gap: 12px; grid-template-columns: 1fr; margin-bottom: 14px; }
+@media (min-width: 720px) { .controls { grid-template-columns: 1fr 1fr; } }
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+select, input[type="range"] { width: 100%; font: inherit; }
+select {
+  background: var(--surface); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 10px; padding: 9px 10px;
+}
+output { font-weight: 650; color: var(--fg); }
+.facts { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 14px 0; }
+.fact { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.fact .v { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.range-wrap { overflow-x: auto; margin-top: 8px; }
+.note { font-size: 13px; color: var(--muted); margin-top: 12px; }
+button.reset {
+  font: inherit; font-size: 13px; background: none; color: var(--blue);
+  border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; cursor: pointer;
+}
+button.reset:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <p class="label">Retail Price &amp; Promotion Decision Engine</p>
+  <h1>Proof and What-if</h1>
+  <p class="muted">Two views of the same work: how accurate the sales forecasts are, and what a price change would predict for one product.</p>
+  <div class="banner"><strong>Read this first.</strong> The forecast check measures prediction accuracy on past data. The what-if view shows a scenario based on estimated price response. Neither shows that a price change will cause the predicted result. Use the what-if view to choose a product for a controlled test, not to set a price.</div>
+
+  <h2>1. How accurate are the sales forecasts?</h2>
+  <p class="muted">Each test hides the most recent weeks of sales, predicts them, and compares the forecast with what actually happened. Lower error is better. The simple method repeats the average of the last four weeks.</p>
+  <div class="grid grid-3" id="scoreboard"></div>
+  <p class="note">The 13-week test was used while the model was being developed, so the 26- and 52-week tests are the cleaner check. Error is the total absolute miss divided by total units sold.</p>
+
+  <h2>2. What would a price change do?</h2>
+  <p class="muted">Choose a product and move the price. The estimate uses how demand responded to price for that product in the past, with the range of plausible responses shown.</p>
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="controls">
+        <div>
+          <label for="series">Product and store</label>
+          <select id="series"></select>
+        </div>
+        <div>
+          <label for="change">Price change: <output id="change-out">0%</output></label>
+          <input id="change" type="range" min="-20" max="20" step="1" value="0">
+        </div>
+      </div>
+      <div class="facts">
+        <div class="fact"><div class="label">Current weekly price</div><div class="v" id="f-price"></div></div>
+        <div class="fact"><div class="label">Scenario price</div><div class="v" id="f-new-price"></div></div>
+        <div class="fact"><div class="label">Units per week now</div><div class="v" id="f-units"></div></div>
+        <div class="fact"><div class="label">Demand response</div><div class="v"><span class="badge" id="f-class"></span></div></div>
+      </div>
+      <button class="reset" id="reset" type="button">Reset to current price</button>
+    </div>
+    <div class="card">
+      <h3>Predicted change in weekly units and revenue</h3>
+      <p class="muted" style="font-size:13px">Bars show the range across the plausible price-response estimates. The centre tick is the best estimate.</p>
+      <div class="range-wrap"><svg id="range" role="img" aria-label="Predicted change range" width="100%" viewBox="0 0 520 190"></svg></div>
+      <p id="result-text" class="muted" style="font-size:14px"></p>
+    </div>
+  </div>
+  <p class="note">Scenario only. Estimates are observational, so the response shown may reflect factors other than price. A controlled test in a few stores is the way to check it.</p>
+
+  <footer>
+    Built from the project's analysis outputs. Forecast figures: <code>data/processed/forecast_holdout/</code>. Price responses: <code>data/processed/module2/price_elasticities.csv</code>. Scoreboard and simulator data: <code>data/processed/showcase/showcase.json</code>.
+  </footer>
+</main>
+
+<script>
+const DATA = {"scoreboard":[{"test_weeks":13,"naive_error":0.2565061536134852,"model_error":0.19986108455837248,"naive_median":0.198980751662453,"model_median":0.18764477179346262,"series_won":59,"series_total":100},{"test_weeks":26,"naive_error":0.3481688149761169,"model_error":0.21933034199400772,"naive_median":0.2836330241350117,"model_median":0.2274127817474813,"series_won":80,"series_total":100},{"test_weeks":52,"naive_error":0.3811733554851773,"model_error":0.2064222135284204,"naive_median":0.36068020194350714,"model_median":0.22515964347919742,"series_won":88,"series_total":100}],"series":[{"id":"FOODS_1_096 at WI_2","item_id":"FOODS_1_096","store_id":"WI_2","base_units":362.69,"base_price":7.23,"elasticity":-9.645,"ci_lower":-12.511,"ci_upper":-6.78,"demand_type":"Price-sensitive"},{"id":"FOODS_1_218 at TX_2","item_id":"FOODS_1_218","store_id":"TX_2","base_units":80.31,"base_price":0.94,"elasticity":14.646,"ci_lower":7.202,"ci_upper":22.089,"demand_type":"Unclear"},{"id":"FOODS_2_019 at CA_1","item_id":"FOODS_2_019","store_id":"CA_1","base_units":102.38,"base_price":3.42,"elasticity":-0.114,"ci_lower":-3.032,"ci_upper":2.804,"demand_type":"Unclear"},{"id":"FOODS_2_197 at CA_1","item_id":"FOODS_2_197","store_id":"CA_1","base_units":127.31,"base_price":3.42,"elasticity":0.045,"ci_lower":-2.431,"ci_upper":2.52,"demand_type":"Unclear"},{"id":"FOODS_2_197 at CA_3","item_id":"FOODS_2_197","store_id":"CA_3","base_units":72.15,"base_price":3.42,"elasticity":-3.963,"ci_lower":-5.722,"ci_upper":-2.204,"demand_type":"Price-sensitive"},{"id":"FOODS_2_244 at CA_3","item_id":"FOODS_2_244","store_id":"CA_3","base_units":63.0,"base_price":5.94,"elasticity":3.775,"ci_lower":-7.445,"ci_upper":14.995,"demand_type":"Unclear"},{"id":"FOODS_2_276 at CA_3","item_id":"FOODS_2_276","store_id":"CA_3","base_units":53.92,"base_price":3.42,"elasticity":-9.564,"ci_lower":-11.894,"ci_upper":-7.234,"demand_type":"Price-sensitive"},{"id":"FOODS_2_347 at CA_3","item_id":"FOODS_2_347","store_id":"CA_3","base_units":77.69,"base_price":2.24,"elasticity":-2.52,"ci_lower":-4.076,"ci_upper":-0.964,"demand_type":"Less sensitive"},{"id":"FOODS_2_360 at CA_3","item_id":"FOODS_2_360","store_id":"CA_3","base_units":99.77,"base_price":0.95,"elasticity":-2.134,"ci_lower":-3.962,"ci_upper":-0.306,"demand_type":"Less sensitive"},{"id":"FOODS_2_360 at TX_3","item_id":"FOODS_2_360","store_id":"TX_3","base_units":102.46,"base_price":0.94,"elasticity":-6.01,"ci_lower":-7.824,"ci_upper":-4.196,"demand_type":"Price-sensitive"},{"id":"FOODS_2_360 at WI_2","item_id":"FOODS_2_360","store_id":"WI_2","base_units":375.46,"base_price":0.95,"elasticity":1.824,"ci_lower":-1.201,"ci_upper":4.85,"demand_type":"Unclear"},{"id":"FOODS_3_030 at TX_2","item_id":"FOODS_3_030","store_id":"TX_2","base_units":124.31,"base_price":1.25,"elasticity":-0.683,"ci_lower":-6.584,"ci_upper":5.218,"demand_type":"Unclear"},{"id":"FOODS_3_030 at TX_3","item_id":"FOODS_3_030","store_id":"TX_3","base_units":137.92,"base_price":1.25,"elasticity":-2.34,"ci_lower":-8.471,"ci_upper":3.791,"demand_type":"Unclear"},{"id":"FOODS_3_080 at CA_1","item_id":"FOODS_3_080","store_id":"CA_1","base_units":125.0,"base_price":1.68,"elasticity":-2.552,"ci_lower":-2.94,"ci_upper":-2.165,"demand_type":"Price-sensitive"},{"id":"FOODS_3_080 at CA_3","item_id":"FOODS_3_080","store_id":"CA_3","base_units":89.46,"base_price":1.68,"elasticity":-3.916,"ci_lower":-4.301,"ci_upper":-3.531,"demand_type":"Price-sensitive"},{"id":"FOODS_3_080 at TX_2","item_id":"FOODS_3_080","store_id":"TX_2","base_units":109.85,"base_price":1.68,"elasticity":-2.594,"ci_lower":-3.28,"ci_upper":-1.909,"demand_type":"Price-sensitive"},{"id":"FOODS_3_090 at CA_1","item_id":"FOODS_3_090","store_id":"CA_1","base_units":364.69,"base_price":1.6,"elasticity":6.588,"ci_lower":0.426,"ci_upper":12.75,"demand_type":"Unclear"},{"id":"FOODS_3_090 at CA_2","item_id":"FOODS_3_090","store_id":"CA_2","base_units":323.69,"base_price":1.6,"elasticity":6.652,"ci_lower":1.189,"ci_upper":12.114,"demand_type":"Unclear"},{"id":"FOODS_3_090 at CA_3","item_id":"FOODS_3_090","store_id":"CA_3","base_units":758.23,"base_price":1.6,"elasticity":14.294,"ci_lower":7.241,"ci_upper":21.348,"demand_type":"Unclear"},{"id":"FOODS_3_090 at CA_4","item_id":"FOODS_3_090","store_id":"CA_4","base_units":180.08,"base_price":1.6,"elasticity":5.996,"ci_lower":0.716,"ci_upper":11.276,"demand_type":"Unclear"},{"id":"FOODS_3_090 at TX_1","item_id":"FOODS_3_090","store_id":"TX_1","base_units":348.62,"base_price":1.5,"elasticity":4.36,"ci_lower":-2.309,"ci_upper":11.029,"demand_type":"Unclear"},{"id":"FOODS_3_090 at TX_2","item_id":"FOODS_3_090","store_id":"TX_2","base_units":422.23,"base_price":1.5,"elasticity":4.226,"ci_lower":-3.572,"ci_upper":12.025,"demand_type":"Unclear"},{"id":"FOODS_3_090 at TX_3","item_id":"FOODS_3_090","store_id":"TX_3","base_units":433.77,"base_price":1.5,"elasticity":3.856,"ci_lower":-3.133,"ci_upper":10.844,"demand_type":"Unclear"},{"id":"FOODS_3_090 at WI_1","item_id":"FOODS_3_090","store_id":"WI_1","base_units":139.31,"base_price":1.39,"elasticity":5.945,"ci_lower":-2.671,"ci_upper":14.562,"demand_type":"Unclear"},{"id":"FOODS_3_090 at WI_2","item_id":"FOODS_3_090","store_id":"WI_2","base_units":181.38,"base_price":1.39,"elasticity":8.863,"ci_lower":0.582,"ci_upper":17.143,"demand_type":"Unclear"},{"id":"FOODS_3_090 at WI_3","item_id":"FOODS_3_090","store_id":"WI_3","base_units":527.46,"base_price":1.39,"elasticity":7.484,"ci_lower":-3.085,"ci_upper":18.052,"demand_type":"Unclear"},{"id":"FOODS_3_099 at CA_1","item_id":"FOODS_3_099","store_id":"CA_1","base_units":98.23,"base_price":2.56,"elasticity":-0.604,"ci_lower":-3.465,"ci_upper":2.258,"demand_type":"Unclear"},{"id":"FOODS_3_099 at TX_2","item_id":"FOODS_3_099","store_id":"TX_2","base_units":114.69,"base_price":2.56,"elasticity":-1.771,"ci_lower":-2.805,"ci_upper":-0.738,"demand_type":"Less sensitive"},{"id":"FOODS_3_202 at CA_1","item_id":"FOODS_3_202","store_id":"CA_1","base_units":103.62,"base_price":4.68,"elasticity":-5.945,"ci_lower":-8.579,"ci_upper":-3.312,"demand_type":"Price-sensitive"},{"id":"FOODS_3_202 at CA_3","item_id":"FOODS_3_202","store_id":"CA_3","base_units":149.62,"base_price":4.68,"elasticity":-4.01,"ci_lower":-4.986,"ci_upper":-3.034,"demand_type":"Price-sensitive"},{"id":"FOODS_3_202 at TX_1","item_id":"FOODS_3_202","store_id":"TX_1","base_units":173.15,"base_price":4.48,"elasticity":-6.213,"ci_lower":-9.615,"ci_upper":-2.811,"demand_type":"Price-sensitive"},{"id":"FOODS_3_202 at TX_2","item_id":"FOODS_3_202","store_id":"TX_2","base_units":136.69,"base_price":4.37,"elasticity":-5.424,"ci_lower":-8.326,"ci_upper":-2.522,"demand_type":"Price-sensitive"},{"id":"FOODS_3_202 at TX_3","item_id":"FOODS_3_202","store_id":"TX_3","base_units":199.46,"base_price":4.48,"elasticity":-0.399,"ci_lower":-7.45,"ci_upper":6.651,"demand_type":"Unclear"},{"id":"FOODS_3_226 at WI_1","item_id":"FOODS_3_226","store_id":"WI_1","base_units":249.0,"base_price":1.68,"elasticity":1.735,"ci_lower":1.144,"ci_upper":2.326,"demand_type":"Unclear"},{"id":"FOODS_3_226 at WI_2","item_id":"FOODS_3_226","store_id":"WI_2","base_units":290.31,"base_price":1.68,"elasticity":3.448,"ci_lower":2.272,"ci_upper":4.623,"demand_type":"Unclear"},{"id":"FOODS_3_226 at WI_3","item_id":"FOODS_3_226","store_id":"WI_3","base_units":325.31,"base_price":1.68,"elasticity":-0.088,"ci_lower":-0.888,"ci_upper":0.711,"demand_type":"Unclear"},{"id":"FOODS_3_281 at CA_3","item_id":"FOODS_3_281","store_id":"CA_3","base_units":110.31,"base_price":1.25,"elasticity":-3.841,"ci_lower":-8.568,"ci_upper":0.886,"demand_type":"Unclear"},{"id":"FOODS_3_282 at CA_3","item_id":"FOODS_3_282","store_id":"CA_3","base_units":287.23,"base_price":2.56,"elasticity":10.526,"ci_lower":2.92,"ci_upper":18.132,"demand_type":"Unclear"},{"id":"FOODS_3_288 at CA_3","item_id":"FOODS_3_288","store_id":"CA_3","base_units":236.23,"base_price":1.5,"elasticity":22.001,"ci_lower":19.212,"ci_upper":24.79,"demand_type":"Unclear"},{"id":"FOODS_3_295 at CA_3","item_id":"FOODS_3_295","store_id":"CA_3","base_units":114.46,"base_price":0.8,"elasticity":9.19,"ci_lower":5.503,"ci_upper":12.877,"demand_type":"Unclear"},{"id":"FOODS_3_295 at TX_2","item_id":"FOODS_3_295","store_id":"TX_2","base_units":79.85,"base_price":0.8,"elasticity":-7.177,"ci_lower":-17.942,"ci_upper":3.589,"demand_type":"Unclear"},{"id":"FOODS_3_318 at CA_1","item_id":"FOODS_3_318","store_id":"CA_1","base_units":80.77,"base_price":1.48,"elasticity":2.757,"ci_lower":-1.379,"ci_upper":6.892,"demand_type":"Unclear"},{"id":"FOODS_3_318 at CA_3","item_id":"FOODS_3_318","store_id":"CA_3","base_units":149.38,"base_price":1.48,"elasticity":6.344,"ci_lower":-0.025,"ci_upper":12.713,"demand_type":"Unclear"},{"id":"FOODS_3_318 at WI_2","item_id":"FOODS_3_318","store_id":"WI_2","base_units":212.69,"base_price":1.48,"elasticity":5.424,"ci_lower":1.481,"ci_upper":9.367,"demand_type":"Unclear"},{"id":"FOODS_3_318 at WI_3","item_id":"FOODS_3_318","store_id":"WI_3","base_units":171.77,"base_price":1.48,"elasticity":3.462,"ci_lower":-0.751,"ci_upper":7.676,"demand_type":"Unclear"},{"id":"FOODS_3_319 at CA_3","item_id":"FOODS_3_319","store_id":"CA_3","base_units":44.46,"base_price":0.93,"elasticity":14.695,"ci_lower":5.925,"ci_upper":23.465,"demand_type":"Unclear"},{"id":"FOODS_3_362 at CA_3","item_id":"FOODS_3_362","store_id":"CA_3","base_units":192.23,"base_price":2.5,"elasticity":15.985,"ci_lower":12.715,"ci_upper":19.255,"demand_type":"Unclear"},{"id":"FOODS_3_377 at TX_2","item_id":"FOODS_3_377","store_id":"TX_2","base_units":179.15,"base_price":1.68,"elasticity":-2.192,"ci_lower":-3.127,"ci_upper":-1.257,"demand_type":"Price-sensitive"},{"id":"FOODS_3_377 at TX_3","item_id":"FOODS_3_377","store_id":"TX_3","base_units":288.69,"base_price":1.68,"elasticity":0.831,"ci_lower":0.274,"ci_upper":1.388,"demand_type":"Unclear"},{"id":"FOODS_3_389 at CA_3","item_id":"FOODS_3_389","store_id":"CA_3","base_units":112.15,"base_price":1.68,"elasticity":-2.415,"ci_lower":-3.051,"ci_upper":-1.778,"demand_type":"Price-sensitive"},{"id":"FOODS_3_406 at CA_3","item_id":"FOODS_3_406","store_id":"CA_3","base_units":100.0,"base_price":0.8,"elasticity":-9.063,"ci_lower":-20.855,"ci_upper":2.73,"demand_type":"Unclear"},{"id":"FOODS_3_455 at CA_3","item_id":"FOODS_3_455","store_id":"CA_3","base_units":53.38,"base_price":2.48,"elasticity":-0.923,"ci_lower":-3.801,"ci_upper":1.954,"demand_type":"Unclear"},{"id":"FOODS_3_491 at CA_3","item_id":"FOODS_3_491","store_id":"CA_3","base_units":67.54,"base_price":1.6,"elasticity":7.762,"ci_lower":2.939,"ci_upper":12.585,"demand_type":"Unclear"},{"id":"FOODS_3_501 at CA_3","item_id":"FOODS_3_501","store_id":"CA_3","base_units":116.69,"base_price":0.8,"elasticity":6.716,"ci_lower":-2.1,"ci_upper":15.532,"demand_type":"Unclear"},{"id":"FOODS_3_501 at TX_2","item_id":"FOODS_3_501","store_id":"TX_2","base_units":85.31,"base_price":0.8,"elasticity":-3.527,"ci_lower":-9.721,"ci_upper":2.666,"demand_type":"Unclear"},{"id":"FOODS_3_541 at CA_3","item_id":"FOODS_3_541","store_id":"CA_3","base_units":42.46,"base_price":0.96,"elasticity":24.386,"ci_lower":11.513,"ci_upper":37.259,"demand_type":"Unclear"},{"id":"FOODS_3_555 at CA_1","item_id":"FOODS_3_555","store_id":"CA_1","base_units":126.69,"base_price":1.68,"elasticity":-0.324,"ci_lower":-0.809,"ci_upper":0.161,"demand_type":"Unclear"},{"id":"FOODS_3_555 at CA_2","item_id":"FOODS_3_555","store_id":"CA_2","base_units":134.31,"base_price":1.68,"elasticity":0.84,"ci_lower":-0.752,"ci_upper":2.432,"demand_type":"Unclear"},{"id":"FOODS_3_555 at CA_3","item_id":"FOODS_3_555","store_id":"CA_3","base_units":203.08,"base_price":1.68,"elasticity":-0.059,"ci_lower":-0.455,"ci_upper":0.338,"demand_type":"Unclear"},{"id":"FOODS_3_555 at TX_1","item_id":"FOODS_3_555","store_id":"TX_1","base_units":186.15,"base_price":1.68,"elasticity":-5.519,"ci_lower":-6.521,"ci_upper":-4.517,"demand_type":"Price-sensitive"},{"id":"FOODS_3_555 at TX_2","item_id":"FOODS_3_555","store_id":"TX_2","base_units":295.77,"base_price":1.68,"elasticity":-2.594,"ci_lower":-3.35,"ci_upper":-1.838,"demand_type":"Price-sensitive"},{"id":"FOODS_3_555 at TX_3","item_id":"FOODS_3_555","store_id":"TX_3","base_units":166.38,"base_price":1.68,"elasticity":-5.197,"ci_lower":-6.141,"ci_upper":-4.253,"demand_type":"Price-sensitive"},{"id":"FOODS_3_555 at WI_3","item_id":"FOODS_3_555","store_id":"WI_3","base_units":173.46,"base_price":1.68,"elasticity":-5.937,"ci_lower":-6.667,"ci_upper":-5.206,"demand_type":"Price-sensitive"},{"id":"FOODS_3_586 at CA_1","item_id":"FOODS_3_586","store_id":"CA_1","base_units":258.85,"base_price":1.68,"elasticity":-0.654,"ci_lower":-1.168,"ci_upper":-0.141,"demand_type":"Less sensitive"},{"id":"FOODS_3_586 at CA_2","item_id":"FOODS_3_586","store_id":"CA_2","base_units":230.54,"base_price":1.68,"elasticity":0.11,"ci_lower":-1.297,"ci_upper":1.518,"demand_type":"Unclear"},{"id":"FOODS_3_586 at CA_3","item_id":"FOODS_3_586","store_id":"CA_3","base_units":436.54,"base_price":1.68,"elasticity":0.404,"ci_lower":0.062,"ci_upper":0.746,"demand_type":"Unclear"},{"id":"FOODS_3_586 at CA_4","item_id":"FOODS_3_586","store_id":"CA_4","base_units":108.54,"base_price":1.68,"elasticity":-1.176,"ci_lower":-2.725,"ci_upper":0.373,"demand_type":"Unclear"},{"id":"FOODS_3_586 at TX_1","item_id":"FOODS_3_586","store_id":"TX_1","base_units":349.54,"base_price":1.68,"elasticity":-2.056,"ci_lower":-2.522,"ci_upper":-1.59,"demand_type":"Price-sensitive"},{"id":"FOODS_3_586 at TX_2","item_id":"FOODS_3_586","store_id":"TX_2","base_units":547.38,"base_price":1.68,"elasticity":-1.428,"ci_lower":-2.074,"ci_upper":-0.782,"demand_type":"Less sensitive"},{"id":"FOODS_3_586 at TX_3","item_id":"FOODS_3_586","store_id":"TX_3","base_units":409.77,"base_price":1.68,"elasticity":-2.302,"ci_lower":-2.913,"ci_upper":-1.692,"demand_type":"Price-sensitive"},{"id":"FOODS_3_586 at WI_1","item_id":"FOODS_3_586","store_id":"WI_1","base_units":97.54,"base_price":1.68,"elasticity":-0.163,"ci_lower":-0.686,"ci_upper":0.361,"demand_type":"Unclear"},{"id":"FOODS_3_586 at WI_3","item_id":"FOODS_3_586","store_id":"WI_3","base_units":215.46,"base_price":1.68,"elasticity":-5.342,"ci_lower":-5.75,"ci_upper":-4.935,"demand_type":"Price-sensitive"},{"id":"FOODS_3_587 at CA_1","item_id":"FOODS_3_587","store_id":"CA_1","base_units":169.23,"base_price":2.48,"elasticity":-27.402,"ci_lower":-42.221,"ci_upper":-12.584,"demand_type":"Price-sensitive"},{"id":"FOODS_3_587 at CA_3","item_id":"FOODS_3_587","store_id":"CA_3","base_units":223.23,"base_price":2.48,"elasticity":4.772,"ci_lower":-0.476,"ci_upper":10.019,"demand_type":"Unclear"},{"id":"FOODS_3_587 at TX_1","item_id":"FOODS_3_587","store_id":"TX_1","base_units":169.31,"base_price":2.48,"elasticity":-3.11,"ci_lower":-4.651,"ci_upper":-1.57,"demand_type":"Price-sensitive"},{"id":"FOODS_3_587 at TX_2","item_id":"FOODS_3_587","store_id":"TX_2","base_units":197.77,"base_price":2.48,"elasticity":-3.373,"ci_lower":-5.012,"ci_upper":-1.735,"demand_type":"Price-sensitive"},{"id":"FOODS_3_587 at TX_3","item_id":"FOODS_3_587","store_id":"TX_3","base_units":186.77,"base_price":2.48,"elasticity":-6.978,"ci_lower":-10.103,"ci_upper":-3.853,"demand_type":"Price-sensitive"},{"id":"FOODS_3_587 at WI_3","item_id":"FOODS_3_587","store_id":"WI_3","base_units":173.31,"base_price":2.48,"elasticity":-21.948,"ci_lower":-34.58,"ci_upper":-9.316,"demand_type":"Price-sensitive"},{"id":"FOODS_3_607 at CA_3","item_id":"FOODS_3_607","store_id":"CA_3","base_units":96.15,"base_price":2.48,"elasticity":-3.016,"ci_lower":-6.193,"ci_upper":0.161,"demand_type":"Unclear"},{"id":"FOODS_3_607 at TX_2","item_id":"FOODS_3_607","store_id":"TX_2","base_units":122.92,"base_price":2.48,"elasticity":-3.543,"ci_lower":-5.531,"ci_upper":-1.556,"demand_type":"Price-sensitive"},{"id":"FOODS_3_635 at CA_3","item_id":"FOODS_3_635","store_id":"CA_3","base_units":70.31,"base_price":0.95,"elasticity":23.161,"ci_lower":12.084,"ci_upper":34.237,"demand_type":"Unclear"},{"id":"FOODS_3_681 at CA_1","item_id":"FOODS_3_681","store_id":"CA_1","base_units":115.77,"base_price":1.0,"elasticity":-1.89,"ci_lower":-3.319,"ci_upper":-0.46,"demand_type":"Less sensitive"},{"id":"FOODS_3_681 at CA_3","item_id":"FOODS_3_681","store_id":"CA_3","base_units":248.38,"base_price":1.0,"elasticity":-1.759,"ci_lower":-3.131,"ci_upper":-0.387,"demand_type":"Less sensitive"},{"id":"FOODS_3_681 at WI_3","item_id":"FOODS_3_681","store_id":"WI_3","base_units":335.92,"base_price":1.0,"elasticity":-1.233,"ci_lower":-3.035,"ci_upper":0.569,"demand_type":"Unclear"},{"id":"FOODS_3_694 at CA_3","item_id":"FOODS_3_694","store_id":"CA_3","base_units":120.23,"base_price":1.68,"elasticity":-1.426,"ci_lower":-2.191,"ci_upper":-0.66,"demand_type":"Less sensitive"},{"id":"FOODS_3_694 at TX_1","item_id":"FOODS_3_694","store_id":"TX_1","base_units":139.54,"base_price":1.68,"elasticity":-1.588,"ci_lower":-2.773,"ci_upper":-0.402,"demand_type":"Less sensitive"},{"id":"FOODS_3_694 at TX_2","item_id":"FOODS_3_694","store_id":"TX_2","base_units":133.15,"base_price":1.68,"elasticity":1.588,"ci_lower":0.28,"ci_upper":2.896,"demand_type":"Unclear"},{"id":"FOODS_3_694 at TX_3","item_id":"FOODS_3_694","store_id":"TX_3","base_units":168.15,"base_price":1.68,"elasticity":-1.51,"ci_lower":-2.443,"ci_upper":-0.576,"demand_type":"Less sensitive"},{"id":"FOODS_3_694 at WI_1","item_id":"FOODS_3_694","store_id":"WI_1","base_units":136.38,"base_price":1.68,"elasticity":-0.569,"ci_lower":-1.217,"ci_upper":0.079,"demand_type":"Unclear"},{"id":"FOODS_3_694 at WI_2","item_id":"FOODS_3_694","store_id":"WI_2","base_units":241.38,"base_price":1.68,"elasticity":2.143,"ci_lower":0.89,"ci_upper":3.395,"demand_type":"Unclear"},{"id":"FOODS_3_694 at WI_3","item_id":"FOODS_3_694","store_id":"WI_3","base_units":299.92,"base_price":1.68,"elasticity":-0.897,"ci_lower":-1.393,"ci_upper":-0.402,"demand_type":"Less sensitive"},{"id":"FOODS_3_723 at CA_3","item_id":"FOODS_3_723","store_id":"CA_3","base_units":167.31,"base_price":1.6,"elasticity":9.957,"ci_lower":4.707,"ci_upper":15.206,"demand_type":"Unclear"},{"id":"FOODS_3_723 at TX_1","item_id":"FOODS_3_723","store_id":"TX_1","base_units":112.38,"base_price":1.5,"elasticity":2.866,"ci_lower":-2.742,"ci_upper":8.474,"demand_type":"Unclear"},{"id":"FOODS_3_723 at TX_2","item_id":"FOODS_3_723","store_id":"TX_2","base_units":129.15,"base_price":1.5,"elasticity":3.204,"ci_lower":-2.399,"ci_upper":8.807,"demand_type":"Unclear"},{"id":"FOODS_3_723 at TX_3","item_id":"FOODS_3_723","store_id":"TX_3","base_units":112.08,"base_price":1.5,"elasticity":2.562,"ci_lower":-2.69,"ci_upper":7.814,"demand_type":"Unclear"},{"id":"FOODS_3_723 at WI_2","item_id":"FOODS_3_723","store_id":"WI_2","base_units":203.38,"base_price":1.5,"elasticity":4.382,"ci_lower":-1.444,"ci_upper":10.207,"demand_type":"Unclear"},{"id":"FOODS_3_723 at WI_3","item_id":"FOODS_3_723","store_id":"WI_3","base_units":182.15,"base_price":1.5,"elasticity":1.872,"ci_lower":-2.999,"ci_upper":6.743,"demand_type":"Unclear"},{"id":"FOODS_3_741 at CA_1","item_id":"FOODS_3_741","store_id":"CA_1","base_units":105.08,"base_price":1.35,"elasticity":-2.402,"ci_lower":-7.018,"ci_upper":2.213,"demand_type":"Unclear"},{"id":"FOODS_3_808 at CA_3","item_id":"FOODS_3_808","store_id":"CA_3","base_units":84.46,"base_price":0.93,"elasticity":13.046,"ci_lower":4.146,"ci_upper":21.946,"demand_type":"Unclear"},{"id":"HOUSEHOLD_1_303 at CA_3","item_id":"HOUSEHOLD_1_303","store_id":"CA_3","base_units":87.62,"base_price":0.98,"elasticity":17.811,"ci_lower":9.625,"ci_upper":25.998,"demand_type":"Unclear"}],"price_change_range":[-0.2,0.2],"baseline_weeks":13};
+
+const pct = (x, digits = 1) => (x * 100).toFixed(digits) + "%";
+const signed = (x, digits = 1) => (x > 0 ? "+" : x < 0 ? "−" : "") + Math.abs(x).toFixed(digits) + "%";
+const money = x => "$" + x.toFixed(2);
+const units = x => x.toFixed(1);
+
+function classBadge(type) {
+  const el = document.getElementById("f-class");
+  el.textContent = type;
+  el.className = "badge" + (type === "Price-sensitive" ? " sensitive" : type === "Unclear" ? " unclear" : "");
+}
+
+function renderScoreboard() {
+  const host = document.getElementById("scoreboard");
+  host.innerHTML = "";
+  DATA.scoreboard.forEach(row => {
+    const card = document.createElement("div");
+    card.className = "card";
+    const top = Math.max(row.naive_error, row.model_error);
+    const bar = (cls, value, label) => `
+      <div class="bar-row">
+        <span class="muted">${label}</span>
+        <div class="bar-track"><div class="bar-fill ${cls}" style="width:${(value / top * 100).toFixed(1)}%"></div></div>
+        <span class="bar-value">${pct(value)}</span>
+      </div>`;
+    card.innerHTML = `
+      <div class="label">Test period</div>
+      <h3>Last ${row.test_weeks} weeks</h3>
+      <div class="kpi">${row.series_won} of ${row.series_total}</div>
+      <p class="muted" style="font-size:13px;margin-bottom:8px">products where the model is more accurate than the simple method</p>
+      ${bar("naive", row.naive_error, "Simple")}
+      ${bar("model", row.model_error, "Model")}
+      <p class="muted" style="font-size:12px;margin:8px 0 0">Median product: ${pct(row.naive_median)} simple, ${pct(row.model_median)} model</p>`;
+    host.appendChild(card);
+  });
+}
+
+function fillSeries() {
+  const select = document.getElementById("series");
+  const sorted = [...DATA.series].sort((a, b) => a.id.localeCompare(b.id));
+  sorted.forEach((s, i) => {
+    const opt = document.createElement("option");
+    opt.value = String(DATA.series.indexOf(s));
+    opt.textContent = s.id;
+    select.appendChild(opt);
+  });
+  const first = DATA.series.findIndex(s => s.id === "FOODS_3_681 at CA_1");
+  select.value = String(first >= 0 ? first : 0);
+}
+
+function scenario(s, change) {
+  const f = (e) => Math.pow(1 + change, e);
+  const best = f(s.elasticity);
+  const lo = Math.min(f(s.ci_lower), f(s.ci_upper));
+  const hi = Math.max(f(s.ci_lower), f(s.ci_upper));
+  const rev = e => Math.pow(1 + change, 1 + e);
+  const revBest = rev(s.elasticity);
+  const revLo = Math.min(rev(s.ci_lower), rev(s.ci_upper));
+  const revHi = Math.max(rev(s.ci_lower), rev(s.ci_upper));
+  return {
+    units: best,
+    unitsRange: [lo, hi],
+    revenue: revBest,
+    revenueRange: [revLo, revHi],
+  };
+}
+
+function drawRange(s, change) {
+  const svg = document.getElementById("range");
+  const sc = scenario(s, change);
+  const W = 520, left = 150, right = 500;
+  const rows = [
+    { label: "Units per week", center: sc.units - 1, lo: sc.unitsRange[0] - 1, hi: sc.unitsRange[1] - 1, color: "var(--blue)" },
+    { label: "Weekly revenue", center: sc.revenue - 1, lo: sc.revenueRange[0] - 1, hi: sc.revenueRange[1] - 1, color: "var(--purple)" },
+  ];
+  const limit = Math.max(0.1, ...rows.flatMap(r => [Math.abs(r.lo), Math.abs(r.hi)])) * 1.15;
+  const x = v => left + (v + limit) / (2 * limit) * (right - left);
+  let out = `<line x1="${x(0)}" y1="14" x2="${x(0)}" y2="150" stroke="var(--muted)" stroke-dasharray="4 4"/>`;
+  rows.forEach((r, i) => {
+    const y = 48 + i * 62;
+    out += `<text x="0" y="${y + 5}" fill="var(--fg)" font-size="13">${r.label}</text>`;
+    out += `<line x1="${x(r.lo)}" y1="${y}" x2="${x(r.hi)}" y2="${y}" stroke="${r.color}" stroke-width="6" stroke-linecap="round" opacity="0.35"/>`;
+    out += `<circle cx="${x(r.center)}" cy="${y}" r="6" fill="${r.color}"/>`;
+    out += `<text x="${x(r.lo)}" y="${y - 12}" fill="var(--muted)" font-size="11" text-anchor="middle">${signed(r.lo * 100, 0)}</text>`;
+    out += `<text x="${x(r.hi)}" y="${y - 12}" fill="var(--muted)" font-size="11" text-anchor="middle">${signed(r.hi * 100, 0)}</text>`;
+  });
+  out += `<text x="${x(0)}" y="172" fill="var(--muted)" font-size="11" text-anchor="middle">0 = no change</text>`;
+  svg.innerHTML = out;
+  return sc;
+}
+
+function update() {
+  const s = DATA.series[Number(document.getElementById("series").value)];
+  const change = Number(document.getElementById("change").value) / 100;
+  document.getElementById("change-out").textContent = (change > 0 ? "+" : "") + Math.round(change * 100) + "%";
+  document.getElementById("f-price").textContent = money(s.base_price);
+  document.getElementById("f-new-price").textContent = money(s.base_price * (1 + change));
+  document.getElementById("f-units").textContent = units(s.base_units) + " units";
+  classBadge(s.demand_type);
+  const sc = drawRange(s, change);
+  const unitsPct = (sc.units - 1) * 100, revPct = (sc.revenue - 1) * 100;
+  let note = s.demand_type === "Unclear"
+    ? "The estimate is too uncertain to act on; treat this as a prompt for a test."
+    : "Use this to choose a test, not to set a price.";
+  if (s.elasticity > 0) {
+    note = "This estimate is positive, which is not a normal demand response. It most likely reflects other factors, so it should not be used for pricing.";
+  } else if (s.elasticity < -3) {
+    note = "This estimate is implausibly large for a typical product. Treat it as a warning sign about the data, not as a forecast.";
+  }
+  document.getElementById("result-text").textContent =
+    `At ${signed(change * 100, 0)} on price, estimated units change by ${signed(unitsPct)} and weekly revenue by ${signed(revPct)} (best estimate). ` + note;
+}
+
+document.getElementById("series").addEventListener("change", update);
+document.getElementById("change").addEventListener("input", update);
+document.getElementById("reset").addEventListener("click", () => {
+  document.getElementById("change").value = 0;
+  update();
+});
+
+renderScoreboard();
+fillSeries();
+update();
+</script>
+</body>
+</html>

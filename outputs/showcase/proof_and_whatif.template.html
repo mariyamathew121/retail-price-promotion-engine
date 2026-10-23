@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Proof and What-if</title>
+<style>
+:root {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --fg: #1f2433;
+  --muted: #5d6478;
+  --line: #e1e4ee;
+  --blue: #4466e8;
+  --blue-soft: #edf1ff;
+  --purple: #805ad5;
+  --orange: #e8833d;
+  --orange-soft: #fff3e8;
+  --pink: #dc5797;
+  --pink-soft: #fff0f7;
+  --red: #d94b55;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141722;
+    --surface: #1c2130;
+    --fg: #eef0f7;
+    --muted: #a2a8bb;
+    --line: #2d3446;
+    --blue: #8fa8f5;
+    --blue-soft: #222b47;
+    --purple: #b29cf0;
+    --orange: #f0a06a;
+    --orange-soft: #3a2d24;
+    --pink: #ef8cc0;
+    --pink-soft: #3a2432;
+    --red: #ef8a8f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141722;
+  --surface: #1c2130;
+  --fg: #eef0f7;
+  --muted: #a2a8bb;
+  --line: #2d3446;
+  --blue: #8fa8f5;
+  --blue-soft: #222b47;
+  --purple: #b29cf0;
+  --orange: #f0a06a;
+  --orange-soft: #3a2d24;
+  --pink: #ef8cc0;
+  --pink-soft: #3a2432;
+  --red: #ef8a8f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.6 -apple-system, "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 980px; margin: 0 auto; padding-block: 32px 56px; }
+h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 20px; margin: 40px 0 6px; text-wrap: balance; }
+h3 { font-size: 15px; margin: 0 0 4px; }
+p { margin: 0 0 10px; max-width: 66ch; }
+.muted { color: var(--muted); }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.banner {
+  background: var(--orange-soft);
+  border: 1px solid var(--orange);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 18px 0 0;
+  font-size: 14px;
+}
+.banner strong { color: var(--orange); }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px;
+  min-width: 0;
+}
+.grid { display: grid; gap: 14px; grid-template-columns: 1fr; margin-top: 14px; }
+@media (min-width: 720px) { .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 720px) { .grid-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); } }
+.kpi { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; margin: 2px 0; }
+.bar-row { display: grid; grid-template-columns: 74px 1fr 56px; gap: 10px; align-items: center; margin: 8px 0; font-size: 13px; }
+.bar-track { background: var(--line); border-radius: 6px; height: 14px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 6px; }
+.bar-fill.naive { background: var(--muted); }
+.bar-fill.model { background: var(--blue); }
+.bar-value { font-variant-numeric: tabular-nums; text-align: right; }
+.badge {
+  display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--blue-soft); color: var(--blue);
+}
+.badge.sensitive { background: var(--pink-soft); color: var(--pink); border-color: var(--pink); }
+.badge.unclear { background: var(--orange-soft); color: var(--orange); border-color: var(--orange); }
+.controls { display: grid; gap: 12px; grid-template-columns: 1fr; margin-bottom: 14px; }
+@media (min-width: 720px) { .controls { grid-template-columns: 1fr 1fr; } }
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+select, input[type="range"] { width: 100%; font: inherit; }
+select {
+  background: var(--surface); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 10px; padding: 9px 10px;
+}
+output { font-weight: 650; color: var(--fg); }
+.facts { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 14px 0; }
+.fact { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.fact .v { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.range-wrap { overflow-x: auto; margin-top: 8px; }
+.note { font-size: 13px; color: var(--muted); margin-top: 12px; }
+button.reset {
+  font: inherit; font-size: 13px; background: none; color: var(--blue);
+  border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; cursor: pointer;
+}
+button.reset:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <p class="label">Retail Price &amp; Promotion Decision Engine</p>
+  <h1>Proof and What-if</h1>
+  <p class="muted">Two views of the same work: how accurate the sales forecasts are, and what a price change would predict for one product.</p>
+  <div class="banner"><strong>Read this first.</strong> The forecast check measures prediction accuracy on past data. The what-if view shows a scenario based on estimated price response. Neither shows that a price change will cause the predicted result. Use the what-if view to choose a product for a controlled test, not to set a price.</div>
+
+  <h2>1. How accurate are the sales forecasts?</h2>
+  <p class="muted">Each test hides the most recent weeks of sales, predicts them, and compares the forecast with what actually happened. Lower error is better. The simple method repeats the average of the last four weeks.</p>
+  <div class="grid grid-3" id="scoreboard"></div>
+  <p class="note">The 13-week test was used while the model was being developed, so the 26- and 52-week tests are the cleaner check. Error is the total absolute miss divided by total units sold.</p>
+
+  <h2>2. What would a price change do?</h2>
+  <p class="muted">Choose a product and move the price. The estimate uses how demand responded to price for that product in the past, with the range of plausible responses shown.</p>
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="controls">
+        <div>
+          <label for="series">Product and store</label>
+          <select id="series"></select>
+        </div>
+        <div>
+          <label for="change">Price change: <output id="change-out">0%</output></label>
+          <input id="change" type="range" min="-20" max="20" step="1" value="0">
+        </div>
+      </div>
+      <div class="facts">
+        <div class="fact"><div class="label">Current weekly price</div><div class="v" id="f-price"></div></div>
+        <div class="fact"><div class="label">Scenario price</div><div class="v" id="f-new-price"></div></div>
+        <div class="fact"><div class="label">Units per week now</div><div class="v" id="f-units"></div></div>
+        <div class="fact"><div class="label">Demand response</div><div class="v"><span class="badge" id="f-class"></span></div></div>
+      </div>
+      <button class="reset" id="reset" type="button">Reset to current price</button>
+    </div>
+    <div class="card">
+      <h3>Predicted change in weekly units and revenue</h3>
+      <p class="muted" style="font-size:13px">Bars show the range across the plausible price-response estimates. The centre tick is the best estimate.</p>
+      <div class="range-wrap"><svg id="range" role="img" aria-label="Predicted change range" width="100%" viewBox="0 0 520 190"></svg></div>
+      <p id="result-text" class="muted" style="font-size:14px"></p>
+    </div>
+  </div>
+  <p class="note">Scenario only. Estimates are observational, so the response shown may reflect factors other than price. A controlled test in a few stores is the way to check it.</p>
+
+  <footer>
+    Built from the project's analysis outputs. Forecast figures: <code>data/processed/forecast_holdout/</code>. Price responses: <code>data/processed/module2/price_elasticities.csv</code>. Scoreboard and simulator data: <code>data/processed/showcase/showcase.json</code>.
+  </footer>
+</main>
+
+<script>
+const DATA = /*__DATA__*/null;
+
+const pct = (x, digits = 1) => (x * 100).toFixed(digits) + "%";
+const signed = (x, digits = 1) => (x > 0 ? "+" : x < 0 ? "−" : "") + Math.abs(x).toFixed(digits) + "%";
+const money = x => "$" + x.toFixed(2);
+const units = x => x.toFixed(1);
+
+function classBadge(type) {
+  const el = document.getElementById("f-class");
+  el.textContent = type;
+  el.className = "badge" + (type === "Price-sensitive" ? " sensitive" : type === "Unclear" ? " unclear" : "");
+}
+
+function renderScoreboard() {
+  const host = document.getElementById("scoreboard");
+  host.innerHTML = "";
+  DATA.scoreboard.forEach(row => {
+    const card = document.createElement("div");
+    card.className = "card";
+    const top = Math.max(row.naive_error, row.model_error);
+    const bar = (cls, value, label) => `
+      <div class="bar-row">
+        <span class="muted">${label}</span>
+        <div class="bar-track"><div class="bar-fill ${cls}" style="width:${(value / top * 100).toFixed(1)}%"></div></div>
+        <span class="bar-value">${pct(value)}</span>
+      </div>`;
+    card.innerHTML = `
+      <div class="label">Test period</div>
+      <h3>Last ${row.test_weeks} weeks</h3>
+      <div class="kpi">${row.series_won} of ${row.series_total}</div>
+      <p class="muted" style="font-size:13px;margin-bottom:8px">products where the model is more accurate than the simple method</p>
+      ${bar("naive", row.naive_error, "Simple")}
+      ${bar("model", row.model_error, "Model")}
+      <p class="muted" style="font-size:12px;margin:8px 0 0">Median product: ${pct(row.naive_median)} simple, ${pct(row.model_median)} model</p>`;
+    host.appendChild(card);
+  });
+}
+
+function fillSeries() {
+  const select = document.getElementById("series");
+  const sorted = [...DATA.series].sort((a, b) => a.id.localeCompare(b.id));
+  sorted.forEach((s, i) => {
+    const opt = document.createElement("option");
+    opt.value = String(DATA.series.indexOf(s));
+    opt.textContent = s.id;
+    select.appendChild(opt);
+  });
+  const first = DATA.series.findIndex(s => s.id === "FOODS_3_681 at CA_1");
+  select.value = String(first >= 0 ? first : 0);
+}
+
+function scenario(s, change) {
+  const f = (e) => Math.pow(1 + change, e);
+  const best = f(s.elasticity);
+  const lo = Math.min(f(s.ci_lower), f(s.ci_upper));
+  const hi = Math.max(f(s.ci_lower), f(s.ci_upper));
+  const rev = e => Math.pow(1 + change, 1 + e);
+  const revBest = rev(s.elasticity);
+  const revLo = Math.min(rev(s.ci_lower), rev(s.ci_upper));
+  const revHi = Math.max(rev(s.ci_lower), rev(s.ci_upper));
+  return {
+    units: best,
+    unitsRange: [lo, hi],
+    revenue: revBest,
+    revenueRange: [revLo, revHi],
+  };
+}
+
+function drawRange(s, change) {
+  const svg = document.getElementById("range");
+  const sc = scenario(s, change);
+  const W = 520, left = 150, right = 500;
+  const rows = [
+    { label: "Units per week", center: sc.units - 1, lo: sc.unitsRange[0] - 1, hi: sc.unitsRange[1] - 1, color: "var(--blue)" },
+    { label: "Weekly revenue", center: sc.revenue - 1, lo: sc.revenueRange[0] - 1, hi: sc.revenueRange[1] - 1, color: "var(--purple)" },
+  ];
+  const limit = Math.max(0.1, ...rows.flatMap(r => [Math.abs(r.lo), Math.abs(r.hi)])) * 1.15;
+  const x = v => left + (v + limit) / (2 * limit) * (right - left);
+  let out = `<line x1="${x(0)}" y1="14" x2="${x(0)}" y2="150" stroke="var(--muted)" stroke-dasharray="4 4"/>`;
+  rows.forEach((r, i) => {
+    const y = 48 + i * 62;
+    out += `<text x="0" y="${y + 5}" fill="var(--fg)" font-size="13">${r.label}</text>`;
+    out += `<line x1="${x(r.lo)}" y1="${y}" x2="${x(r.hi)}" y2="${y}" stroke="${r.color}" stroke-width="6" stroke-linecap="round" opacity="0.35"/>`;
+    out += `<circle cx="${x(r.center)}" cy="${y}" r="6" fill="${r.color}"/>`;
+    out += `<text x="${x(r.lo)}" y="${y - 12}" fill="var(--muted)" font-size="11" text-anchor="middle">${signed(r.lo * 100, 0)}</text>`;
+    out += `<text x="${x(r.hi)}" y="${y - 12}" fill="var(--muted)" font-size="11" text-anchor="middle">${signed(r.hi * 100, 0)}</text>`;
+  });
+  out += `<text x="${x(0)}" y="172" fill="var(--muted)" font-size="11" text-anchor="middle">0 = no change</text>`;
+  svg.innerHTML = out;
+  return sc;
+}
+
+function update() {
+  const s = DATA.series[Number(document.getElementById("series").value)];
+  const change = Number(document.getElementById("change").value) / 100;
+  document.getElementById("change-out").textContent = (change > 0 ? "+" : "") + Math.round(change * 100) + "%";
+  document.getElementById("f-price").textContent = money(s.base_price);
+  document.getElementById("f-new-price").textContent = money(s.base_price * (1 + change));
+  document.getElementById("f-units").textContent = units(s.base_units) + " units";
+  classBadge(s.demand_type);
+  const sc = drawRange(s, change);
+  const unitsPct = (sc.units - 1) * 100, revPct = (sc.revenue - 1) * 100;
+  let note = s.demand_type === "Unclear"
+    ? "The estimate is too uncertain to act on; treat this as a prompt for a test."
+    : "Use this to choose a test, not to set a price.";
+  if (s.elasticity > 0) {
+    note = "This estimate is positive, which is not a normal demand response. It most likely reflects other factors, so it should not be used for pricing.";
+  } else if (s.elasticity < -3) {
+    note = "This estimate is implausibly large for a typical product. Treat it as a warning sign about the data, not as a forecast.";
+  }
+  document.getElementById("result-text").textContent =
+    `At ${signed(change * 100, 0)} on price, estimated units change by ${signed(unitsPct)} and weekly revenue by ${signed(revPct)} (best estimate). ` + note;
+}
+
+document.getElementById("series").addEventListener("change", update);
+document.getElementById("change").addEventListener("input", update);
+document.getElementById("reset").addEventListener("click", () => {
+  document.getElementById("change").value = 0;
+  update();
+});
+
+renderScoreboard();
+fillSeries();
+update();
+</script>
+</body>
+</html>
